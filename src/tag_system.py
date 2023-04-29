@@ -1,9 +1,4 @@
 
-# NOTE: Se guardan los archivos en un .json con un index
-# NOTE: Se guardan los tags con la lista de index de archivos asociada
-
-# NOTE: Que pasa si se tienen archivos con nombres iguales?
-
 
 def add(file_list: list[str], tag_list: list[str]):
     '''
