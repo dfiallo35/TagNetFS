@@ -21,6 +21,7 @@ class File(Base):
     tags = relationship('Tag', secondary='file_tags', back_populates='files')
 
 
+# CHECK: relarion many to many
 class FileTags(Base):
     __tablename__ = 'file_tags'
 
