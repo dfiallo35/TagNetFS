@@ -1,14 +1,15 @@
-from sqlalchemy import Column, ForeignKey, Integer, String
+from sqlalchemy import Column, Table, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
-from .database import Base
+from .database import Base, engine
 
 
 
 class Tag(Base):
     __tablename__ = 'tags'
 
-    name = Column(String, primary_key=True, unique=True, index=True)
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, index=True)
     files = relationship('File', secondary='file_tags', back_populates='tags')
 
 
@@ -21,10 +22,11 @@ class File(Base):
     tags = relationship('Tag', secondary='file_tags', back_populates='files')
 
 
-# CHECK: relarion many to many
-class FileTags(Base):
-    __tablename__ = 'file_tags'
+file_tags = Table(
+    'file_tags',
+    Base.metadata,
+    Column('tag_id', ForeignKey('tags.name'), primary_key=True),
+    Column('files_id', ForeignKey('files.id'), primary_key=True)
+)
 
-    tag_id = Column(Integer, ForeignKey('tags.name'), primary_key=True)
-    files_id = Column(Integer, ForeignKey('files.id'), primary_key=True)
-
+Base.metadata.create_all(engine)

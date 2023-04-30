@@ -9,6 +9,7 @@ class TagCreate(TagBase):
     pass
 
 class Tag(TagBase):
+    id: int
     name: str
 
     class Config:
@@ -24,7 +25,6 @@ class FileCreate(FileBase):
 class File(FileBase):
     id: int
     direction: str
-
 
     class Config:
         orm_mode = True
