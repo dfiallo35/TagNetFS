@@ -1,3 +1,9 @@
+# Roles:
+- Almacenar datos
+- Enrutar pedidos
+- Consultar el sistema
+
+
 
 # Transparencia:
 - Acceso: Oculta diferencias de repr de datos y como se accede
@@ -21,3 +27,13 @@
 - distribucuion: dividir procesamiento entre diferentes pc
 - replicacion: hacer copias de los datos en diferentes lugares
 - caching: proporcionanr copias de los datos a lso clientes.
+
+
+
+# Todo:
+- Replicacion: 9
+- Coordinacion: 5
+- Sincronizacion: 7
+- tolerancia a fallas: 10
+- nombrado: 6
+- caching
