@@ -58,7 +58,7 @@ async def delete(tag_query: Annotated[List[str], Query()], db: Session = Depends
 
 
 
-@app.get('/files/', summary='List the name and the tags of every file that match the tag query')
+@app.get('/files/', response_model=List[schemas.File], summary='List the name and the tags of every file that match the tag query')
 async def list(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_db)):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     return db_files

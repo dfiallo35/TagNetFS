@@ -36,9 +36,9 @@ def test_list():
     
     assert response.status_code == 200
     assert response.json() == [
-        {'id': 1, 'name': 'file1'},
-        {'id': 2, 'name': 'file2'},
-        {'id': 3, 'name': 'file3'}
+        {'id': 1, 'name': 'file1', 'tags':[{'id':1, 'name':'tag1'}, {'id':2, 'name':'tag2'}]},
+        {'id': 2, 'name': 'file2', 'tags':[{'id':1, 'name':'tag1'}, {'id':2, 'name':'tag2'}]},
+        {'id': 3, 'name': 'file3', 'tags':[{'id':1, 'name':'tag1'}, {'id':2, 'name':'tag2'}]}
     ]
 
 
@@ -58,7 +58,7 @@ def test_add_tags():
     assert response.json() == {"message": "success"}
 
 
-# test delete_tags
+# # test delete_tags
 def test_delete_tags():
     data = {
         "tag_query": [
@@ -74,7 +74,7 @@ def test_delete_tags():
     assert response.json() == {"message": "success"}
 
 
-# test delete
+# # test delete
 def test_delete():
     data = {
         "tag_query": [
