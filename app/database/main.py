@@ -1,12 +1,12 @@
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, Query
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Annotated
 
 from . import crud, models, schemas
 from .database import SessionLocal, engine
 
-models.Base.metadata.create_all(bind=engine)
 
+models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 
@@ -19,6 +19,7 @@ PUT: to update data.
 DELETE: to delete data.
 '''
 
+
 # Dependency
 def get_db():
     db = SessionLocal()
@@ -27,9 +28,10 @@ def get_db():
     finally:
         db.close()
 
+
+
 # TODO: files names uniques?
-# Copy the files to the system and assign them the tags
-@app.post('/add', response_model=List[str], summary='Copy the files to the system and assign them the tags')
+@app.post('/add', summary='Copy the files to the system and assign them the tags')
 async def add(file_list: List[schemas.FileCreate], tag_list: List[schemas.TagCreate], db: Session = Depends(get_db)):
     for file in file_list:
         db_file = crud.create_file(db, file=file)
@@ -42,28 +44,28 @@ async def add(file_list: List[schemas.FileCreate], tag_list: List[schemas.TagCre
                 db_file.tags.append(db_tag)
     db.commit()
 
-    return [file.name for file in file_list]
+    return {"message": "success"}
 
 
-# Delete all the files that match the tag query
+
 @app.delete('/delete', summary='Delete all the files that match the tag query')
-async def delete(tag_query: List[str], db: Session = Depends(get_db)):
+async def delete(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_db)):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     for db_file in db_files:
         db.delete(db_file)
     db.commit()
-    return None
+    return {"message": "success"}
 
-# BUG
-# List the name and the tags of every file that match the tag query
-@app.get('/list', response_model=List[schemas.File], summary='List the name and the tags of every file that match the tag query')
-async def list(tag_query: List[str], db: Session = Depends(get_db)):
+
+
+@app.get('/files/', summary='List the name and the tags of every file that match the tag query')
+async def list(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_db)):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     return db_files
 
-# CHECK
-# Add the tags from the tag list to the files that match the tag query
-@app.post('/add_tags', response_model=None, summary='Add the tags from the tag list to the files that match the tag query')
+
+
+@app.post('/add_tags', summary='Add the tags from the tag list to the files that match the tag query')
 async def add_tags(tag_query: List[str], tag_list: List[str], db: Session = Depends(get_db)):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     for db_file in db_files:
@@ -75,12 +77,12 @@ async def add_tags(tag_query: List[str], tag_list: List[str], db: Session = Depe
                 db_tag = crud.create_tag(db, tag=schemas.TagCreate(name=tag))
                 db_file.tags.append(db_tag)
     db.commit()
-    return None
+    return {"message": "success"}
 
-# CHECK
-# Delete the tags from the tag list to the files that match the tag query
-@app.delete('/delete_tags', response_model=None, summary='Delete the tags from the tag list to the files that match the tag query')
-async def delete_tags(tag_query: List[str], tag_list: List[str], db: Session = Depends(get_db)):
+
+
+@app.delete('/delete_tags', summary='Delete the tags from the tag list to the files that match the tag query')
+async def delete_tags(tag_query: Annotated[List[str], Query()], tag_list: Annotated[List[str], Query()], db: Session = Depends(get_db)):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     for db_file in db_files:
         for tag in tag_list:
@@ -88,6 +90,6 @@ async def delete_tags(tag_query: List[str], tag_list: List[str], db: Session = D
             if db_tag:
                 db_file.tags.remove(db_tag)
     db.commit()
-    return None
+    return {"message": "success"}
 
 
