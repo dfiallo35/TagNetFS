@@ -9,13 +9,15 @@ def add(file_list: list[str], tag_list: list[str]):
 
 def delete(tag_query: list[str]):
     '''
-    Delete all the files that match the tag query'''
+    Delete all the files that match the tag query
+    '''
     ...
 
 
 def qlist(tag_query: list[str]):
     '''
-    List the name and the tags of every file that match the tag query'''
+    List the name and the tags of every file that match the tag query
+    '''
     ...
 
 

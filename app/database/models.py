@@ -4,7 +4,7 @@ from sqlalchemy.orm import relationship
 from .database import Base, engine
 
 
-
+# Tags and Files are many-to-many relationship
 class Tag(Base):
     __tablename__ = 'tags'
 
@@ -17,7 +17,7 @@ class File(Base):
     __tablename__ = 'files'
 
     id = Column(Integer, primary_key=True, index=True)
-    direction = Column(String, unique=True, index=True)
+    name = Column(String, index=True)
 
     tags = relationship('Tag', secondary='file_tags', back_populates='files')
 
@@ -25,8 +25,6 @@ class File(Base):
 file_tags = Table(
     'file_tags',
     Base.metadata,
-    Column('tag_id', ForeignKey('tags.name'), primary_key=True),
+    Column('tag_id', ForeignKey('tags.id'), primary_key=True),
     Column('files_id', ForeignKey('files.id'), primary_key=True)
 )
-
-Base.metadata.create_all(engine)
