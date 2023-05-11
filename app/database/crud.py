@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from . import models, schemas
+from . import models, schemas, tools
 
 
 
@@ -22,7 +22,8 @@ def create_file(db: Session, file: schemas.FileCreate):
     '''
     Create file
     '''
-    db_file = models.File(**file.dict())
+    tools.copy_file(file.file, 'files')
+    db_file = models.File(name=file.name)
     
     db.add(db_file)
     db.commit()
