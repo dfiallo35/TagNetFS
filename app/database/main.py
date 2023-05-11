@@ -1,16 +1,24 @@
-from fastapi import Depends, FastAPI, Query
+from fastapi import FastAPI
+from fastapi import Depends, Query, File, Form
+from fastapi import UploadFile
+from fastapi.responses import HTMLResponse
+
 from sqlalchemy.orm import Session
 from typing import List, Annotated
 
-from . import crud, models, schemas
+from . import crud, models, schemas, tools
 from .database import SessionLocal, engine
+from .schemas import TagCreate, FileCreate
 
 
 models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 
+
 # TODO: Caching with Redis
+# TODO: Save files
+# TODO: Distributed direction of the files in db 
 
 '''
 POST: to create data.
@@ -32,10 +40,15 @@ def get_db():
 
 # TODO: files names uniques?
 @app.post('/add', summary='Copy the files to the system and assign them the tags')
-async def add(file_list: List[schemas.FileCreate], tag_list: List[schemas.TagCreate], db: Session = Depends(get_db)):
-    for file in file_list:
+async def add(
+        file_list: Annotated[List[UploadFile], File(...)],
+        tag_list: Annotated[List[str], Form(...)],
+        db: Session = Depends(get_db)
+    ):
+    
+    for file in [FileCreate(file=f, name=f.filename) for f in file_list]:
         db_file = crud.create_file(db, file=file)
-        for tag in tag_list:
+        for tag in [TagCreate(name=t) for t in tag_list]:
             db_tag = crud.get_tag_by_name(db, tag.name)
             if db_tag:
                 db_file.tags.append(db_tag)
@@ -58,7 +71,7 @@ async def delete(tag_query: Annotated[List[str], Query()], db: Session = Depends
 
 
 
-@app.get('/files/', summary='List the name and the tags of every file that match the tag query')
+@app.get('/files/', response_model=List[schemas.File], summary='List the name and the tags of every file that match the tag query')
 async def list(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_db)):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     return db_files
@@ -93,3 +106,8 @@ async def delete_tags(tag_query: Annotated[List[str], Query()], tag_list: Annota
     return {"message": "success"}
 
 
+
+
+@app.get("/")
+async def main():
+    return {'message': 'Hi'}

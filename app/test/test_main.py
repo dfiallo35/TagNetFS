@@ -7,18 +7,19 @@ client = TestClient(app)
 
 # test add
 def test_add():
+    files = [
+        ("file_list", ("file1.txt", open("test/test_files/file1.txt", "rb"), "application/octet-stream")),
+        ("file_list", ("file2.txt", open("test/test_files/file2.txt", "rb"), "application/octet-stream")),
+        ("file_list", ("file3.txt", open("test/test_files/file3.txt", "rb"), "application/octet-stream"))
+    ]
     data = {
-        "file_list": [
-            {"name": "file1"},
-            {"name": "file2"},
-            {"name": "file3"}
-        ],
-        "tag_list": [
-            {"name": "tag1"},
-            {"name": "tag2"},
+        'tag_list':[
+            "tag1",
+            "tag2"
         ]
     }
-    response = client.post('/add', json=data)
+
+    response = client.post('/add', files=files, data=data)
     
     assert response.status_code == 200
     assert response.json() == {"message": "success"}
@@ -36,9 +37,9 @@ def test_list():
     
     assert response.status_code == 200
     assert response.json() == [
-        {'id': 1, 'name': 'file1'},
-        {'id': 2, 'name': 'file2'},
-        {'id': 3, 'name': 'file3'}
+        {'id': 1, 'name': 'file1.txt', 'tags':[{'id':1, 'name':'tag1'}, {'id':2, 'name':'tag2'}]},
+        {'id': 2, 'name': 'file2.txt', 'tags':[{'id':1, 'name':'tag1'}, {'id':2, 'name':'tag2'}]},
+        {'id': 3, 'name': 'file3.txt', 'tags':[{'id':1, 'name':'tag1'}, {'id':2, 'name':'tag2'}]}
     ]
 
 

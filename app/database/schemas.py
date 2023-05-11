@@ -1,5 +1,6 @@
 from pydantic import BaseModel
-from typing import Union
+from typing import Union, List
+from fastapi import UploadFile
 
 
 # Base classes
@@ -15,6 +16,7 @@ class TagCreate(TagBase):
     pass
 
 class FileCreate(FileBase):
+    file: UploadFile
     pass
 
 
@@ -29,6 +31,7 @@ class Tag(TagBase):
 class File(FileBase):
     id: int
     name: str
+    tags: List[Tag] = []
 
     class Config:
         orm_mode = True
