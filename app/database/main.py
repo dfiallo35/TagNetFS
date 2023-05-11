@@ -93,3 +93,8 @@ async def delete_tags(tag_query: Annotated[List[str], Query()], tag_list: Annota
     return {"message": "success"}
 
 
+
+
+@app.get("/")
+async def main():
+    return {'message': 'Hi'}
