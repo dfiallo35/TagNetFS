@@ -1,8 +1,8 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-# from sqlalchemy.orm import declarative_base
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import as_declarative
+
 from typing import Any
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///./database.db"
@@ -16,7 +16,22 @@ engine = create_engine(
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Base = declarative_base()
+
+
+import Pyro4
+@Pyro4.expose
+class DatabaseSession:
+    def __init__(self):
+        self.session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    
+    def get_db(self):
+        db = self.session()
+        try:
+            yield db
+        finally:
+            db.close()
+
+
 
 @as_declarative()
 class Base:

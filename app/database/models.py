@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Table, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
-from .database import Base, engine
+from .database import Base
 
 
 # Tags and Files are many-to-many relationship

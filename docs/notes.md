@@ -37,3 +37,13 @@
 - tolerancia a fallas: 10
 - nombrado: 6
 - caching
+
+
+
+
+
+# Nombrado:
+
+- Conveniente alta disponibilidad del nivel global.
+- Conveniente el empleo de caching y replicación.
+- Conveniente alta disponibilidad del nivel administrativo dentro de la organización.

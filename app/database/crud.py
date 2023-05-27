@@ -1,6 +1,8 @@
+from os import makedirs
 from sqlalchemy.orm import Session
 
 from . import models, schemas, tools
+
 
 
 
@@ -22,6 +24,7 @@ def create_file(db: Session, file: schemas.FileCreate):
     '''
     Create file
     '''
+    makedirs('files', exist_ok=True)
     tools.copy_file(file.file, 'files')
     db_file = models.File(name=file.name)
     
