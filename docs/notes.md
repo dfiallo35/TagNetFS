@@ -47,3 +47,15 @@
 - Conveniente alta disponibilidad del nivel global.
 - Conveniente el empleo de caching y replicación.
 - Conveniente alta disponibilidad del nivel administrativo dentro de la organización.
+
+
+
+
+
+# Implementacion:
+- Arquitectura cliente-servidor?
+- protocolo TCP/IP o RPC?
+- Servidores concurrentes
+- Punto de entrada desconocido o fijo?
+- Servidor guarda informacion por clientes o en general?
+- Crear docker-compose
