@@ -9,9 +9,6 @@ from app.server.dispatcher import Dispatcher
 # TODO: Comunication between nodes
 class ChordNode:
     def __init__(self, id: int, nbits: int):
-        self.HOST = socket.gethostbyname(socket.gethostname())
-        self.PORT = 9090
-
         self.id = id
         self.FT = [None] * nbits
         self.nodeSet = []
@@ -19,18 +16,11 @@ class ChordNode:
         self.nbits = nbits
         self.max = 2**nbits
 
-        self.server = None
-
 
     def run(self, others: list):
         '''
         Run the node.
         '''
-        if not others:
-            dispatcher = Dispatcher()
-            self.server = ThreadedServer(dispatcher, hostname=self.HOST, port=self.PORT)
-            self.server.start()
-
         self.addNode(self.id)
         for i in others:
             self.addNode(i)
@@ -38,8 +28,6 @@ class ChordNode:
 
         while True:
             sleep(1)
-
-        
 
 
     def addNode(self, id: int):
@@ -107,10 +95,4 @@ class ChordNode:
         print('Successor: {}'.format(self.FT[1]))
         print('Finger Table: {}'.format(self.FT[1:-1]))
         print()
-
-
-
-# n = ChordNode(3, 8)
-# n.run([1, 2, 4, 5, 6, 7])
-# print()
 

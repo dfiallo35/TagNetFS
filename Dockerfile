@@ -6,5 +6,13 @@ COPY requirements.txt ./
 RUN pip3 install --no-cache-dir -r requirements.txt
 RUN rm requirements.txt
 
-COPY ./main.py .
+COPY ./server.py .
+COPY ./client.py .
 COPY ./app ./app
+
+
+
+# COPY ./test ./test
+# COPY ./s.py .
+# COPY ./s1.py .
+# COPY ./c.py .

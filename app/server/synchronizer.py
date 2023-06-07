@@ -1,15 +1,12 @@
-import Pyro4, Pyro4.naming
-
 import threading
 import random
 import time
 
 
 
-@Pyro4.expose
 class Synchronizer():
     def __init__(self) -> None:
-        self.ns = Pyro4.naming.locateNS()
+        self.ns = None
         self.interval = random.randint(10, 30)
         self.thread = threading.Thread(target=self.run)
         self.thread.daemon = True
@@ -21,12 +18,6 @@ class Synchronizer():
             time.sleep(self.interval)
             
             ...
-
-    def leader_election(self):
-        ...
-    
-    def is_leader_active(self):
-        ...
     
     def synchronize_clock(self):
         members = self.ns.list()

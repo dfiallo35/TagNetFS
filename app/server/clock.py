@@ -1,11 +1,9 @@
-import Pyro4
 from threading import Lock
 
 counter = 0
 counter_lock = Lock()
 
 
-@Pyro4.expose
 class LogicalClock:
     def __init__(self, initial_time=0):
         self.time = initial_time

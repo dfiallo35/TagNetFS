@@ -1,20 +1,19 @@
-import rpyc
-from typing import Dict
+import Pyro5.api
 
 
-@rpyc.service
-class Dispatcher(rpyc.Service):
+
+@Pyro5.api.expose
+class Dispatcher:
     def __init__(self):
-        self.petitions: Dict[int:str] = {}
+        self.petitions: dict[int:str] = {}
         self.current_id = 0
         self.get_id = 0
-    
-    @rpyc.exposed
+
+    # TODO: should be async, and called by request
     def add(self, petition: str):
         self.petitions[self.current_id] = petition
         self.current_id += 1
     
-    @rpyc.exposed
     def get(self) -> str:
         if self.petitions.get(self.get_id) is None:
             return  self.get_id, None

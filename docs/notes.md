@@ -36,7 +36,10 @@
 - Sincronizacion: 7
 - tolerancia a fallas: 10
 - nombrado: 6
-- caching
+- caching 6
+
+
+ARP
 
 
 
