@@ -86,7 +86,7 @@ class Server():
             self.election()
             
             try:
-                ns: NameServer|Proxy = Pyro5.api.locate_ns()
+                ns = locate_ns()
                 ns_host = ns._pyroUri.host
                 if ns_host != self.HOST:
                     if ns.list().get(str(self.id)) is None:
@@ -101,7 +101,7 @@ class Server():
         '''
         if self.coordinator:
             try:
-                ns: NameServer|Proxy = Pyro5.api.locate_ns()
+                ns = locate_ns()
                 ns_host = ns._pyroUri.host
                 if self.coordinator.HOST != ns_host:
                     coordinator: rpyc.Connection = rpyc.connect(ns._pyroUri.host, ns._pyroUri.port)
