@@ -1,6 +1,5 @@
 import socket
 from time import sleep
-from rpyc.utils.server import ThreadedServer
 
 from app.server.dispatcher import Dispatcher
 

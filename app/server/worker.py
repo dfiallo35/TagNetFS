@@ -1,6 +1,8 @@
 import Pyro5.api
+from typing import Tuple, List
 
-from app.database.main import *
+from app.database.api import *
+from app.utils.utils import dirs_to_UploadFile
 
 
 
@@ -9,17 +11,23 @@ class Worker():
     def __init__(self):
         ...
     
-    def add(self, file_list: List[UploadFile], tag_list: List[str]):
-        add(file_list, tag_list)
+    def execute(self, job: Tuple[str, List[str], List[str]] | Tuple[str, List[str]]):
+        match job[0]:
+            case 'add':
+                print('add executed...', end='\n')
+                return add(dirs_to_UploadFile(job[1]), job[2], get_db())
+            case 'delete':
+                print('delete executed...', end='\n')
+                return delete(job[1], get_db())
+            case 'list':
+                print('list executed...', end='\n')
+                return qlist(job[1], get_db())
+            case 'add-tags':
+                print('add-tags executed...', end='\n')
+                return add_tags(job[1], job[2], get_db())
+            case 'delete-tags':
+                print('delete-tags executed...', end='\n')
+                return delete_tags(job[1], job[2], get_db())
+            case _:
+                print('Not job implemented')
 
-    def delete(self, tag_query: List[str]):
-        delete(tag_query)
-
-    def list(self, tag_query: List[str]):
-        qlist(tag_query)
-    
-    def add_tags(self, tag_query: List[str], tag_list: List[str]):
-        add_tags(tag_query, tag_list)
-    
-    def delete_tags(self, tag_query: List[str], tag_list: List[str]):
-        delete_tags(tag_query, tag_list)
