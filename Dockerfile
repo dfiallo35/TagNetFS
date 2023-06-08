@@ -9,10 +9,3 @@ RUN rm requirements.txt
 COPY ./server.py .
 COPY ./client.py .
 COPY ./app ./app
-
-
-
-# COPY ./test ./test
-# COPY ./s.py .
-# COPY ./s1.py .
-# COPY ./c.py .
