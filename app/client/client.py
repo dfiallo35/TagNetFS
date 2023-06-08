@@ -13,6 +13,7 @@ class Client:
             ns = locate_ns()
             f = connect(ns, 'request')
             responce = f.request(request)
+            print(responce)
             
         except Pyro5.errors.NamingError:
             print('NOT CONECTED...')

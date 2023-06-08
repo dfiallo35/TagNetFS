@@ -1,7 +1,6 @@
+import os
 import typer
-import socket
 from typing import List
-from fastapi import UploadFile
 
 from app.utils.utils import *
 from app.client.client import Client
@@ -14,39 +13,45 @@ app = typer.Typer()
 
 @app.command()
 def add(
-    file_list: List[typer.FileBinaryRead] = typer.Option(..., '-fl', '--file-list'),
-    tag_list: List[str] = typer.Option(..., '-tl', '--tag-list'),
+    file_list: List[str] = typer.Option(..., '-f', '--file-list'),
+    tag_list: List[str] = typer.Option(..., '-t', '--tag-list'),
 ):
-    print()
-    Client.run(('add', [UploadFile(file=i.read(), filename=i.name) for i in file_list], tag_list))
+    files = []
+    for i in file_list:
+        if not os.path.isfile(i):
+            raise FileNotFoundError(i)
+        with open(i, 'r') as f:
+            files.append((f.read(), os.path.basename(i)))
+    
+    Client.run(('add', files, tag_list))
 
 
 @app.command()
 def delete(
-    tag_query: List[str] = typer.Option(..., '-tq', '--tag-query'),
+    tag_query: List[str] = typer.Option(..., '-q', '--tag-query'),
 ):
     Client.run(('delete', tag_query))
 
 
-@app.command()
-def list(
-    tag_query: List[str] = typer.Option(..., '-tq', '--tag-query'),
+@app.command('list')
+def qist(
+    tag_query: List[str] = typer.Option(..., '-q', '--tag-query'),
 ):
     Client.run(('list', tag_query))
 
 
 @app.command()
 def add_tags(
-    tag_query: List[str] = typer.Option(..., '-tq', '--tag-query'),
-    tag_list: List[str] = typer.Option(..., '-tl', '--tag-list'),
+    tag_query: List[str] = typer.Option(..., '-q', '--tag-query'),
+    tag_list: List[str] = typer.Option(..., '-t', '--tag-list'),
 ):
     Client.run(('add-tags', tag_query, tag_list))
 
 
 @app.command()
 def delete_tags(
-    tag_query: List[str] = typer.Option(..., '-tq', '--tag-query'),
-    tag_list: List[str] = typer.Option(..., '-tl', '--tag-list'),
+    tag_query: List[str] = typer.Option(..., '-q', '--tag-query'),
+    tag_list: List[str] = typer.Option(..., '-t', '--tag-list'),
 ):
     Client.run(('delete-tags', tag_query, tag_list))
 

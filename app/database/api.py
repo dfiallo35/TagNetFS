@@ -6,9 +6,9 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from typing import List, Annotated
 
-from . import crud, models, schemas, tools
-from .database import SessionLocal, engine, DatabaseSession
-from .schemas import TagCreate, FileCreate
+from app.database import crud, models, schemas, tools
+from app.database.database import SessionLocal, engine, DatabaseSession
+from app.database.schemas import TagCreate, FileCreate
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -32,7 +32,7 @@ DELETE: to delete data.
 def get_db():
     db = SessionLocal()
     try:
-        yield db
+        return db
     finally:
         db.close()
 
@@ -70,11 +70,11 @@ def delete(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_d
     return {"message": "success"}
 
 
-
+# FIX: IF not exist tag return {} 
 @app.get('/list/', response_model=List[schemas.File], summary='List the name and the tags of every file that match the tag query')
 def qlist(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_db)):
     db_files = crud.get_files_by_tag_query(db, tag_query)
-    return db_files
+    return {file.name:[tag.name for tag in file.tags] for file in db_files}
 
 
 

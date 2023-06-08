@@ -1,3 +1,4 @@
+import os
 import hashlib
 from typing import List
 from fastapi import UploadFile
@@ -17,6 +18,6 @@ def hashing_address(nbits: int, address: List[str]):
     return h
 
 
-def dir_to_UploadFile(path: str):
-    ...
+def dirs_to_UploadFile(file_list: str):
+    return [UploadFile(file=f, filename=n) for f, n in file_list]
 
