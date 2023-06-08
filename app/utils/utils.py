@@ -1,5 +1,6 @@
 import hashlib
 from typing import List
+from fastapi import UploadFile
 
 
 def hash_addr(bits: int, address: str):
@@ -14,3 +15,8 @@ def hashing_address(nbits: int, address: List[str]):
     h = [hash(nbits, '{}:{}'.format(*i.split(':'))) for i in address]
     h.sort()
     return h
+
+
+def dir_to_UploadFile(path: str):
+    ...
+

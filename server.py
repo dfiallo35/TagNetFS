@@ -19,14 +19,5 @@ def server(
     server.run()
 
 
-# @app.command()
-# def client(
-#     # address: str = typer.Option(..., '-a', '--addr', help='IP:PORT of server to connect.'),
-# ):
-#     client = Client()
-#     client.run()
-
-
-
 if __name__ == '__main__':
     app()

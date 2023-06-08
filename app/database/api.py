@@ -40,7 +40,7 @@ def get_db():
 
 # TODO: files names uniques?
 @app.post('/add', summary='Copy the files to the system and assign them the tags')
-async def add(
+def add(
         file_list: Annotated[List[UploadFile], File(...)],
         tag_list: Annotated[List[str], Form(...)],
         db: Session = Depends(get_db)
@@ -62,7 +62,7 @@ async def add(
 
 
 @app.delete('/delete', summary='Delete all the files that match the tag query')
-async def delete(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_db)):
+def delete(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_db)):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     for db_file in db_files:
         db.delete(db_file)
@@ -72,14 +72,14 @@ async def delete(tag_query: Annotated[List[str], Query()], db: Session = Depends
 
 
 @app.get('/list/', response_model=List[schemas.File], summary='List the name and the tags of every file that match the tag query')
-async def qlist(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_db)):
+def qlist(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_db)):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     return db_files
 
 
 
 @app.post('/add_tags', summary='Add the tags from the tag list to the files that match the tag query')
-async def add_tags(tag_query: List[str], tag_list: List[str], db: Session = Depends(get_db)):
+def add_tags(tag_query: List[str], tag_list: List[str], db: Session = Depends(get_db)):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     for db_file in db_files:
         for tag in tag_list:
@@ -95,7 +95,7 @@ async def add_tags(tag_query: List[str], tag_list: List[str], db: Session = Depe
 
 
 @app.delete('/delete_tags', summary='Delete the tags from the tag list to the files that match the tag query')
-async def delete_tags(tag_query: Annotated[List[str], Query()], tag_list: Annotated[List[str], Query()], db: Session = Depends(get_db)):
+def delete_tags(tag_query: Annotated[List[str], Query()], tag_list: Annotated[List[str], Query()], db: Session = Depends(get_db)):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     for db_file in db_files:
         for tag in tag_list:
@@ -109,5 +109,5 @@ async def delete_tags(tag_query: Annotated[List[str], Query()], tag_list: Annota
 
 
 @app.get("/")
-async def main():
+def main():
     return {'message': 'Hi'}

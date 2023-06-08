@@ -16,7 +16,7 @@ from app.server.worker import Worker
 from app.server.dispatcher import Dispatcher
 
 
-from app.utils.ns import Leader, Node
+from app.utils.ns import *
 
 
 
@@ -24,6 +24,7 @@ from app.utils.ns import Leader, Node
 # TODO: create a var for election
 # TODO: duning election cant change the functionality of server
 
+# TODO: Delete dead nodes. Unregister
 
 
 class Server():
@@ -39,7 +40,10 @@ class Server():
         self.elections: Kthread = None
 
         self.server = None
-
+    
+    @property
+    def node_name(self):
+        return 'node-{}'.format(str(self.id))
     
     def run(self):
         '''
@@ -53,10 +57,10 @@ class Server():
 
 
         try:
-            ns = Pyro5.api.locate_ns()
+            ns = locate_ns()
             self.ns = Node(self.HOST, self.PORT)
             self.server = Worker()
-            self.ns.register(str(self.id), self.server)
+            self.ns.register(self.node_name, self.server)
         except Pyro5.errors.NamingError:
             self.ns = Leader(self.HOST, self.PORT)
             self.server = Dispatcher()
@@ -64,8 +68,10 @@ class Server():
 
 
         while True:
-            # TODO: If leader get Dispatcher, else others functionalities
-            ...
+            sleep(0.5)
+            # if isinstance(self.server, Dispatcher):
+            #     print(self.server.workers(), end='\n')
+
 
 
     ########### ELECTIONS ###########

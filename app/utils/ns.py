@@ -7,6 +7,21 @@ from app.utils.thread import Kthread
 
 
 
+def locate_ns() -> NameServer | Proxy:
+    '''
+    Locate a name server.
+    '''
+    return Pyro5.api.locate_ns()
+
+def connect(ns: NameServer | Proxy, name: str) -> Proxy:
+    '''
+    Get element with register in ns with the given name and return it.
+    '''
+    uri = ns.lookup(name)
+    f = Proxy(uri)
+    return f
+
+
 class Leader:
     def __init__(self, ip: str, port: str):
         self.id = ...
@@ -59,7 +74,7 @@ class Node:
         print("Node running on {}".format(str(self.daemon.locationStr)))
 
         # TODO: what to do with ns
-        self.ns: NameServer|Proxy = Pyro5.api.locate_ns()
+        self.ns: NameServer|Proxy = locate_ns()
         print('Node connected to {}\n'.format(self.ns._pyroUri.host))
     
     def run_daemon(self):
