@@ -2,8 +2,7 @@ import random
 import Pyro5.api
 from typing import Tuple, List
 
-from app.utils.thread import Kthread
-from app.utils.ns import *
+from app.rpc.ns import *
 
 
 
@@ -47,7 +46,6 @@ class Dispatcher:
             worker_name = random.choice(workers)[0]
             ns = Pyro5.api.locate_ns()
 
-            
             f = connect(ns, worker_name)
             return f.execute(job[1])
     

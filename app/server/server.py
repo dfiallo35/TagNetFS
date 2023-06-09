@@ -1,6 +1,5 @@
 import socket
 import logging
-import random
 from time import sleep
 
 import Pyro5.api
@@ -8,11 +7,11 @@ import Pyro5.server
 import Pyro5.errors
 import Pyro5.nameserver
 
+from app.rpc.ns import *
 from app.utils.utils import hash
 from app.utils.thread import Kthread
 from app.server.worker import Worker
 from app.server.dispatcher import Dispatcher
-from app.utils.ns import *
 
 
 
@@ -75,9 +74,6 @@ class Server():
     
     @property
     def is_alive(self):
-        '''
-        Return if Kthread with the self ns is alive or not.
-        '''
         return self.alive
 
     @property

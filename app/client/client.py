@@ -4,7 +4,7 @@ import Pyro5.errors
 from typing import Tuple, List
 
 from app.utils.utils import *
-from app.utils.ns import *
+from app.rpc.ns import *
 
 
 class Client:
