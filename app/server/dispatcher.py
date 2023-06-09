@@ -17,12 +17,7 @@ class Dispatcher:
 
         self.worker_prefix = 'node-'
 
-        # self.dispatch = Kthread(
-        #     target=self.dispatch_work,
-        #     daemon=True,
-        # )
-        # self.dispatch.start()
-
+    # FIX: is adding the request and taking the next job
     def request(self, request: Tuple[str, List[str], List[str]] | Tuple[str, List[str]]):
         self.add(request)
         return self.dispatch_work()
