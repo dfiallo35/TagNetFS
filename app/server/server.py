@@ -34,6 +34,8 @@ logging.basicConfig(
 # TODO: Delete dead nodes. Unregister
 # TODO: Save in db all the directions of the files. New table
 
+
+# NOTE: Seems to be solved
 # BUG: When you close the coordinator server dunning the election of other node, that node crash
 
 
@@ -108,48 +110,51 @@ class Server():
         self.function = Worker()
         self.server.register(self.node_name, self)
         logging.info('Node: {} become worker\n'.format(self.node_name))
+    
+    def locate_ns(self):
+        try:
+            ns = locate_ns()
+        except Pyro5.errors.NamingError:
+            ns = None
+        return ns
 
 
     ########### ELECTIONS ###########
 
     def run_elections(self):
         '''
-        Run the elections in bg.
+        Run the elections loop.
         '''
         while True:
             logging.info('Running election...\n')
-            
-            try:
-                ns = locate_ns()
-            except Pyro5.errors.NamingError:
-                ns = None
-            
+            ns = locate_ns()
             try:
                 if not self.coordinator or not self.coordinator.is_alive:
-                    self.election(ns)
+                    self.election()
                 else:
                     if ns and ns._pyroUri.host != self.coordinator.host:
-                        self.election(ns)
-
+                        self.election()
             except Pyro5.errors.PyroError:
-                self.election(ns)
+                self.election()
             
             logging.info('Election end\n')
             sleep(self.timeout)
     
 
-    def find_coordinator(self, ns: Proxy):
+    def find_coordinator(self):
         '''
         Find the coordinator.
         '''
         try:
             if not self.coordinator or not self.coordinator.is_alive:
+                ns = locate_ns()
                 if ns:
                     coordinator = connect(ns, 'leader')
                     return coordinator
                 else:
                     return self
             else:
+                ns = locate_ns()
                 if ns and ns._pyroUri.host != self.coordinator.host:
                     coordinator = connect(ns, 'leader')
                     return coordinator
@@ -157,6 +162,7 @@ class Server():
                     return self.coordinator
                     
         except Pyro5.errors.PyroError:
+            ns = locate_ns()
             if ns:
                 coordinator = connect(ns, 'leader')
                 return coordinator
@@ -164,19 +170,22 @@ class Server():
                 return self
 
 
-    def election(self, ns: Proxy):
+    def election(self):
         '''
         Go elections.
         '''
         self._in_elections = True
-        coordinator = self.find_coordinator(ns)
+        coordinator = self.find_coordinator()
         self.coordinator = coordinator
         
-        if self.coordinator.id == self.id:
-            self.become_leader()
-            logging.info("Node {} is the new coordinator".format(self.node_name))
-        else:
-            self.become_node()
+        try:
+            if self.coordinator.id == self.id:
+                self.become_leader()
+                logging.info("Node {} is the new coordinator".format(self.node_name))
+            else:
+                self.become_node()
+        except Pyro5.errors.PyroError:
+            self.election()
         self._in_elections = False
 
     

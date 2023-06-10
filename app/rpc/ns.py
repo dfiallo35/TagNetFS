@@ -107,7 +107,6 @@ def locate_ns() -> Proxy:
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     with contextlib.suppress(Exception):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
-    # sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
     sock.settimeout(0.7)
     
     ns = []
