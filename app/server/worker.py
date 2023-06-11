@@ -59,7 +59,6 @@ class Worker():
             args=(request, id),
             daemon=True,
         )
-        print('run job...')
         self.running[id].start()
     
 

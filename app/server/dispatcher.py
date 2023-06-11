@@ -19,25 +19,25 @@ class Dispatcher:
         self.worker_prefix = 'worker-'
 
     # FIX: make it async
+    # FIX: TRY
     def request(self, request: Tuple):
         results = self.db.execute(request)
         return results
         
-
+    # FIX: DELETE?
     def add(self, request: Tuple[str, List[str], List[str]] | Tuple[str, List[str]]):
         job_id = self.current_id + 1
         self.current_id = job_id
         self.requests[job_id] = request
         return job_id
-    
+    # FIX: DELETE?
     def get(self) -> Tuple[int, Tuple[str, List[str], List[str]]] | Tuple[int, Tuple[str, List[str]]]:
         if self.requests.get(self.get_id) is None:
             return  self.get_id, None
-        
         petition = self.requests.pop(self.get_id)
         self.get_id += 1
         return self.get_id - 1, petition
-    
+    # FIX: DELETE?
     def workers(self):
         ns = locate_ns()
         return list(ns.list(prefix=self.worker_prefix).items())
@@ -46,7 +46,7 @@ class Dispatcher:
     # TODO: Hacer db distribuida, dividoda en n grupos
     # TODO: replicacion y consistencia, se debe resolver en el propio grupo
     # NOTE: Cada server posee una db con los archivos que le pertenecen y con todos los tags de este
-
+    # FIX: DELETE?
     def dispatch(self, request):
         if self.requests.get(self.get_id) is None:
             return  None
