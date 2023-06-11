@@ -35,14 +35,21 @@ class DataBase:
         workers = self.workers()
         return workers
     
-    # FIX
+    
     def merge_results(self, results: List[dict]):
         '''
         Merge all the results given by the workers
         '''
-        return {i:r for i,r in enumerate(results)}
+        if results and results[0] and list(results[0].keys())[0] == 'messagge':
+            return {'messagge': 'correct'}
+        else:
+            r = {}
+            for i in results:
+                r.update(i)
+            return r
     
     
+    # FIX: TRY
     def execute(self, request: Tuple):
         job_id = self._job_id + 1
         self._job_id = job_id
