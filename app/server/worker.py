@@ -20,6 +20,9 @@ class Worker():
         self.running: Dict[int, Kthread] = {}
         self.results: Dict[int, dict] = {}
         self._ask_results_timeout = 0.1
+
+    def ping(self):
+        return 'OK'
     
     @property
     def clock(self):
@@ -44,6 +47,7 @@ class Worker():
             if r is not None:
                 return r
             sleep(self._ask_results_timeout)
+            # FIX: timeout will always increase
             self._ask_results_timeout = increse_timeout(self._ask_results_timeout)
     
 

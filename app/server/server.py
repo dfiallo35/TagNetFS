@@ -27,18 +27,15 @@ logging.basicConfig(
 
 
 
-# NOTE: New idea with Pyro5
-# TODO: create a var for election
-# TODO: duning election cant change the functionality of server
-
 # TODO: Delete dead nodes. Unregister
-# TODO: Save in db all the directions of the files. New table
 
 # TODO: Differents logs
 
+# TODO: file for configs
 
-# NOTE: Seems to be solved
-# BUG: When you close the coordinator server dunning the election of other node, that node crash
+# TODO: change the needed try to repeat the proces n times if exception
+
+# TODO: save a file with te node state?
 
 
 @Pyro5.api.expose
@@ -99,8 +96,7 @@ class Server():
         )
         self._elections.start()
 
-        while True:
-            sleep(1)
+        while True: ...
 
 
     def become_leader(self):
@@ -122,17 +118,19 @@ class Server():
 
     ########### ELECTIONS ###########
 
+    # TODO: Try if ns if alive, in other case call locate_ns
     def run_elections(self):
         '''
         Run the elections loop.
         '''
         while True:
             logging.info('Running election...\n')
-            ns = locate_ns()
+            
             try:
                 if not self._coordinator or not self._coordinator.is_alive:
                     self.election()
                 else:
+                    ns = locate_ns()
                     if ns and ns._pyroUri.host != self._coordinator.host:
                         self.election()
             except Pyro5.errors.PyroError:
@@ -148,26 +146,27 @@ class Server():
         '''
         try:
             if not self._coordinator or not self._coordinator.is_alive:
-                ns = locate_ns()
-                if ns:
+                try:
+                    ns = locate_ns()
                     coordinator = connect(ns, 'leader')
                     return coordinator
-                else:
+                except Pyro5.errors.NamingError:
                     return self
             else:
-                ns = locate_ns()
-                if ns and ns._pyroUri.host != self._coordinator.host:
-                    coordinator = connect(ns, 'leader')
-                    return coordinator
-                else:
+                try:
+                    ns = locate_ns()
+                    if ns and ns._pyroUri.host != self._coordinator.host:
+                        coordinator = connect(ns, 'leader')
+                        return coordinator
+                except Pyro5.errors.NamingError:
                     return self._coordinator
                     
         except Pyro5.errors.PyroError:
-            ns = locate_ns()
-            if ns:
+            try:
+                ns = locate_ns()
                 coordinator = connect(ns, 'leader')
                 return coordinator
-            else:
+            except Pyro5.errors.NamingError:
                 return self
 
 
@@ -200,5 +199,6 @@ class Server():
         except:
             self._server = None
     
-
+    def ping(self):
+        return 'OK'
 

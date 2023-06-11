@@ -1,4 +1,5 @@
 import random
+from time import sleep
 from typing import Tuple, List, Dict
 
 from app.rpc.ns import *
@@ -20,34 +21,40 @@ from app.utils.thread import Kthread
 
 # TODO: Create clock
 
-# TODO: what happend if a worker disconnect and the it reconnect to the network?
+# TODO: what happend if a worker disconnect and then it reconnect to the network?
 
 # FIX: If you do add with the same file it can be copied to differents db
+
+# TODO: the request should be send to various nodes from the same group to do not lose it?
 
 class DataBase:
     def __init__(self) -> None:
         self._job_id = 0
 
+        # TODO: variate
         self._groups_number = 2
+        self._timeout = 0.1
+        
+        # TODO: cache
         self.groups = {}
 
-        self.jobs: Dict[int, List[Kthread]] = {}
         self.results: Dict[int, List[dict]] = {}
-
         self.worker_prefix = 'worker-'
     
+    # FIX: TRY
     def workers(self):
-        ns = locate_ns()
-        return list(ns.list(prefix=self.worker_prefix).items())
-    
-    # FIX: Method used to select what are the workers that should do the job
-    def best_workers(self):
         '''
-        Select workers that should do the next job.
+        Get the list of all availble workers.
         '''
-        return [random.choice(x) for x in self.get_groups().values()]
+        while True:
+            try:
+                ns = locate_ns()
+                return list(ns.list(prefix=self.worker_prefix).items())
+            except Pyro5.errors.NamingError:
+                sleep(self._timeout)
     
-    # TODO: what to do when the nomber of groups change?
+
+    # TODO: what to do when the number of groups change?
     def assign_groups(self, workers: list, groups: Dict):
         '''
         Get the current grups and the workers without groups.
@@ -59,11 +66,10 @@ class DataBase:
                 smaller_groups.append((i, 0))
                 groups[i] = []
         
-        ns = locate_ns()
         for i in workers:
             sorted_groups = sorted(smaller_groups, key=lambda x: x[1])
             smaller = sorted_groups[0][0]
-            w = connect(ns, i[0])
+            w = direct_connect(i[1])
             w.set_group(smaller)
             groups[smaller].append(i)
             x = smaller_groups.index(sorted_groups[0])
@@ -79,23 +85,27 @@ class DataBase:
         '''
         Get a dictionary of group:list[workers].
         '''
-        workers = self.workers()
-        ns = locate_ns()
-        groups = {}
-        let_me_solo_her_workers = []
-        for worker in workers:
-            w = connect(ns, worker[0])
-            if w.group is None:
-                let_me_solo_her_workers.append(worker)
-            else:
-                if groups.get(w.group) is None:
-                    groups[w.group] = [worker]
-                else:
-                    groups[w.group].append(worker)
-        
-        groups = self.assign_groups(let_me_solo_her_workers, groups)
-        return groups
+        while True:
+            try:
+                workers = self.workers()
+                groups = {}
+                workers_without_group = []
+                for worker in workers:
+                    w = direct_connect(worker[1])
+                    if w.group is None:
+                        workers_without_group.append(worker)
+                    else:
+                        if groups.get(w.group) is None:
+                            groups[w.group] = [worker]
+                        else:
+                            groups[w.group].append(worker)
+                
+                groups = self.assign_groups(workers_without_group, groups)
+                return groups
             
+            except Pyro5.errors.PyroError:
+                sleep(self._timeout)
+    
 
     def merge_results(self, results: List[dict]):
         '''
@@ -115,21 +125,42 @@ class DataBase:
         job_id = self._job_id + 1
         self._job_id = job_id
 
-        ns = locate_ns()
-        workers = self.best_workers()
+        while True:
+            try:
+                workers = self.best_workers()
+                self.assign_jobs(workers, request, job_id)
+                self.get_results(workers, job_id)
+                return self.merge_results(self.results[job_id])
+            except Pyro5.errors.PyroError:
+                sleep(self._timeout)
+
+    # FIX: Method used to select what are the workers that should do the job
+    def best_workers(self):
+        '''
+        Select workers that should do the next job.
+        '''
+        return [random.choice(x) for x in self.get_groups().values()]
+
+    def assign_jobs(self, workers: List[Tuple], request: Tuple, id: int):
+        '''
+        Send the request to the workers.
+        '''
         for worker in workers:
             print('send work to {}...'.format(worker))
-            w = connect(ns, worker[0])
-            w.run(request, job_id)
-        
-        # FIX: wait responce
-        self.results[job_id] = []
+            w = direct_connect(worker[1])
+            w.run(request, id)
+
+    def get_results(self, workers: List[Tuple], id: int):
+        '''
+        Wait for the results.
+        '''
+        self.results[id] = []
         for worker in workers:
             print('wait responce from {}...'.format(worker))
-            w = connect(ns, worker[0])
-            r = w.join(job_id)
-            self.results[job_id].append(r)
+            w = direct_connect(worker[1])
+            r = w.join(id)
+            self.results[id].append(r)
+    
 
-        print('return responce...')
-        return self.merge_results(self.results[job_id])
-
+    def replicate(self):
+        ...
