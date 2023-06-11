@@ -3,6 +3,7 @@ from time import sleep
 from typing import Tuple, List, Dict
 
 from app.rpc.ns import *
+from app.utils.utils import *
 from app.utils.thread import Kthread
 
 
@@ -46,12 +47,14 @@ class DataBase:
         '''
         Get the list of all availble workers.
         '''
+        timeout = self._timeout
         while True:
             try:
                 ns = locate_ns()
                 return list(ns.list(prefix=self.worker_prefix).items())
             except Pyro5.errors.NamingError:
-                sleep(self._timeout)
+                sleep(timeout)
+                timeout = increse_timeout(timeout)
     
 
     # TODO: what to do when the number of groups change?
@@ -60,22 +63,34 @@ class DataBase:
         Get the current grups and the workers without groups.
         Return the new groups with the workers added.
         '''
-        smaller_groups = [(k, len(v)) for k, v in zip(groups.keys(), groups.values())]
-        for i in range(self._groups_number):
-            if i not in [x for x, y in smaller_groups]:
-                smaller_groups.append((i, 0))
+        # Get the groups name and his number of workers, and add empty group if not exist
+        groups_len = []
+        for i in range(1, self._groups_number+1):
+            if worker not in groups.keys():
+                groups_len.append((i, 0))
                 groups[i] = []
+            else:
+                groups_len.append((i, len(groups[i])))
         
-        for i in workers:
-            sorted_groups = sorted(smaller_groups, key=lambda x: x[1])
+        # Assign group to workers
+        sorted_groups = groups_len
+        for worker in workers:
+            # Sort groups by number of workers
+            sorted_groups = sorted(sorted_groups, key=lambda x: x[1])
+            # get the smaller group
             smaller = sorted_groups[0][0]
-            w = direct_connect(i[1])
+            
+            # connect to the current worker
+            w = direct_connect(worker[1])
+            # set the group
             w.set_group(smaller)
-            groups[smaller].append(i)
-            x = smaller_groups.index(sorted_groups[0])
-            x = smaller_groups.pop(x)
+            # add the worker to the group list
+            groups[smaller].append(worker)
+            
+            # then add it to the group_len list
+            x = sorted_groups.pop(0)
             x = (x[0], x[1]+1)
-            smaller_groups.append(x)
+            sorted_groups.append(x)
         return groups
 
 
@@ -85,6 +100,7 @@ class DataBase:
         '''
         Get a dictionary of group:list[workers].
         '''
+        timeout = self._timeout
         while True:
             try:
                 workers = self.workers()
@@ -104,7 +120,8 @@ class DataBase:
                 return groups
             
             except Pyro5.errors.PyroError:
-                sleep(self._timeout)
+                sleep(timeout)
+                timeout = increse_timeout(timeout)
     
 
     def merge_results(self, results: List[dict]):
@@ -125,6 +142,7 @@ class DataBase:
         job_id = self._job_id + 1
         self._job_id = job_id
 
+        timeout = self._timeout
         while True:
             try:
                 workers = self.best_workers()
@@ -132,7 +150,8 @@ class DataBase:
                 self.get_results(workers, job_id)
                 return self.merge_results(self.results[job_id])
             except Pyro5.errors.PyroError:
-                sleep(self._timeout)
+                sleep(timeout)
+                timeout = increse_timeout(timeout)
 
     # FIX: Method used to select what are the workers that should do the job
     def best_workers(self):

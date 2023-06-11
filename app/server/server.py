@@ -27,8 +27,6 @@ logging.basicConfig(
 
 
 
-# TODO: Delete dead nodes. Unregister
-
 # TODO: Differents logs
 
 # TODO: file for configs

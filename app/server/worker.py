@@ -19,7 +19,7 @@ class Worker():
         
         self.running: Dict[int, Kthread] = {}
         self.results: Dict[int, dict] = {}
-        self._ask_results_timeout = 0.1
+        self._timeout = 0.1
 
     def ping(self):
         return 'OK'
@@ -41,14 +41,14 @@ class Worker():
         return None
 
     def join(self, id: int):
+        timeout = self._timeout
         while True:
             r = self.get_result(id)
             print(r)
             if r is not None:
                 return r
-            sleep(self._ask_results_timeout)
-            # FIX: timeout will always increase
-            self._ask_results_timeout = increse_timeout(self._ask_results_timeout)
+            sleep(self._timeout)
+            timeout = increse_timeout(timeout)
     
 
     def get_db(self):
