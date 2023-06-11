@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Annotated
 
 from app.database import crud, models, schemas, tools
-from app.database.database import SessionLocal, engine, DatabaseSession
+from app.database.database import engine, DatabaseSession
 from app.database.schemas import TagCreate, FileCreate
 
 
@@ -29,8 +29,8 @@ DELETE: to delete data.
 
 
 # Dependency
-def get_db():
-    db = SessionLocal()
+def get_db(seccion):
+    db = seccion()
     try:
         return db
     finally:
@@ -62,7 +62,10 @@ def add(
 
 
 @app.delete('/delete', summary='Delete all the files that match the tag query')
-def delete(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_db)):
+def delete(
+        tag_query: Annotated[List[str], Query()],
+        db: Session = Depends(get_db)
+    ):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     for db_file in db_files:
         db.delete(db_file)
@@ -72,14 +75,21 @@ def delete(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_d
 
 # FIX: IF not exist tag return {} 
 @app.get('/list/', response_model=List[schemas.File], summary='List the name and the tags of every file that match the tag query')
-def qlist(tag_query: Annotated[List[str], Query()], db: Session = Depends(get_db)):
+def qlist(
+        tag_query: Annotated[List[str], Query()],
+        db: Session = Depends(get_db)
+    ):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     return {file.name:[tag.name for tag in file.tags] for file in db_files}
 
 
 
 @app.post('/add_tags', summary='Add the tags from the tag list to the files that match the tag query')
-def add_tags(tag_query: List[str], tag_list: List[str], db: Session = Depends(get_db)):
+def add_tags(
+        tag_query: List[str],
+        tag_list: List[str],
+        db: Session = Depends(get_db)
+    ):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     for db_file in db_files:
         for tag in tag_list:
@@ -95,7 +105,11 @@ def add_tags(tag_query: List[str], tag_list: List[str], db: Session = Depends(ge
 
 
 @app.delete('/delete_tags', summary='Delete the tags from the tag list to the files that match the tag query')
-def delete_tags(tag_query: Annotated[List[str], Query()], tag_list: Annotated[List[str], Query()], db: Session = Depends(get_db)):
+def delete_tags(
+        tag_query: Annotated[List[str], Query()],
+        tag_list: Annotated[List[str], Query()],
+        db: Session = Depends(get_db)
+    ):
     db_files = crud.get_files_by_tag_query(db, tag_query)
     for db_file in db_files:
         for tag in tag_list:

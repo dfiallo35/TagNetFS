@@ -14,7 +14,7 @@ class Dispatcher:
         self.current_id = 0
         self.get_id = 0
 
-        self.worker_prefix = 'node-'
+        self.worker_prefix = 'worker-'
 
     # FIX: is adding the request and taking the next job
     def request(self, request: Tuple[str, List[str], List[str]] | Tuple[str, List[str]]):

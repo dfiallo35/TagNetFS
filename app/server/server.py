@@ -42,21 +42,24 @@ logging.basicConfig(
 @Pyro5.api.expose
 class Server():
     def __init__(self, nbits: int = 8):
-        self.HOST = socket.gethostbyname(socket.gethostname())
-        self.PORT = 9090
-        self._id = hash(nbits, self.HOST)
-        self.nbits = nbits
+        self._host = socket.gethostbyname(socket.gethostname())
+        self._port = 9090
+        self._id = hash(nbits, self._host)
+        self._nbits = nbits
         logging.info('Node name: {}'.format(self.node_name))
 
-        self.alive = True
-        self.timeout: int = 10
+        self._alive = True
+        self._timeout: int = 10
         self._in_elections = False
-        self.elections: Kthread = None
-        self.coordinator: Server = None
+        self._elections: Kthread = None
+        self._coordinator: Server = None
         
-        self.server = None
-        self.function = None
+        self._server = None
+        self._root = None
 
+    
+    def a(self):
+        return 1
     
     @property
     def id(self):
@@ -64,19 +67,23 @@ class Server():
     
     @property
     def host(self):
-        return self.HOST
+        return self._host
 
     @property
     def port(self):
-        return self.PORT
+        return self._port
 
     @property
     def node_name(self):
         return 'node-{}'.format(str(self.id))
     
     @property
+    def worker_name(self):
+        return 'worker-{}'.format(str(self.id))
+    
+    @property
     def is_alive(self):
-        return self.alive
+        return self._alive
 
     @property
     def in_elections(self):
@@ -87,11 +94,11 @@ class Server():
         '''
         Run the node.
         '''
-        self.elections = Kthread(
+        self._elections = Kthread(
             target=self.run_elections,
             daemon=True
         )
-        self.elections.start()
+        self._elections.start()
 
         while True:
             sleep(1)
@@ -99,16 +106,18 @@ class Server():
 
     def become_leader(self):
         self.kill()
-        self.server = Leader(self.HOST, self.PORT)
-        self.function = Dispatcher()
-        self.server.register('leader', self)
+        self._server = Leader(self._host, self._port)
+        self._root = Dispatcher()
+        self._server.register('leader', self)
+        self._server.register('request', self._root)
         logging.info('Node: {} become leader\n'.format(self.node_name))
 
     def become_node(self):
         self.kill()
-        self.server = Node(self.HOST, self.PORT)
-        self.function = Worker()
-        self.server.register(self.node_name, self)
+        self._server = Node(self._host, self._port)
+        self._root = Worker()
+        self._server.register(self.node_name, self)
+        self._server.register(self.worker_name, self._root)
         logging.info('Node: {} become worker\n'.format(self.node_name))
     
     def locate_ns(self):
@@ -129,16 +138,16 @@ class Server():
             logging.info('Running election...\n')
             ns = locate_ns()
             try:
-                if not self.coordinator or not self.coordinator.is_alive:
+                if not self._coordinator or not self._coordinator.is_alive:
                     self.election()
                 else:
-                    if ns and ns._pyroUri.host != self.coordinator.host:
+                    if ns and ns._pyroUri.host != self._coordinator.host:
                         self.election()
             except Pyro5.errors.PyroError:
                 self.election()
             
             logging.info('Election end\n')
-            sleep(self.timeout)
+            sleep(self._timeout)
     
 
     def find_coordinator(self):
@@ -146,7 +155,7 @@ class Server():
         Find the coordinator.
         '''
         try:
-            if not self.coordinator or not self.coordinator.is_alive:
+            if not self._coordinator or not self._coordinator.is_alive:
                 ns = locate_ns()
                 if ns:
                     coordinator = connect(ns, 'leader')
@@ -155,11 +164,11 @@ class Server():
                     return self
             else:
                 ns = locate_ns()
-                if ns and ns._pyroUri.host != self.coordinator.host:
+                if ns and ns._pyroUri.host != self._coordinator.host:
                     coordinator = connect(ns, 'leader')
                     return coordinator
                 else:
-                    return self.coordinator
+                    return self._coordinator
                     
         except Pyro5.errors.PyroError:
             ns = locate_ns()
@@ -176,10 +185,10 @@ class Server():
         '''
         self._in_elections = True
         coordinator = self.find_coordinator()
-        self.coordinator = coordinator
+        self._coordinator = coordinator
         
         try:
-            if self.coordinator.id == self.id:
+            if self._coordinator.id == self.id:
                 self.become_leader()
                 logging.info("Node {} is the new coordinator".format(self.node_name))
             else:
@@ -194,10 +203,10 @@ class Server():
         kill server.
         '''
         try:
-            self.server.kill_daemon()
-            self.server = None
+            self._server.kill_daemon()
+            self._server = None
         except:
-            self.server = None
+            self._server = None
     
 
 
