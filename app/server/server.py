@@ -34,6 +34,8 @@ logging.basicConfig(
 # TODO: Delete dead nodes. Unregister
 # TODO: Save in db all the directions of the files. New table
 
+# TODO: Differents logs
+
 
 # NOTE: Seems to be solved
 # BUG: When you close the coordinator server dunning the election of other node, that node crash
@@ -57,9 +59,6 @@ class Server():
         self._server = None
         self._root = None
 
-    
-    def a(self):
-        return 1
     
     @property
     def id(self):

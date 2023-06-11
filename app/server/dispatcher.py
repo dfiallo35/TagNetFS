@@ -3,6 +3,7 @@ import Pyro5.api
 from typing import Tuple, List
 
 from app.rpc.ns import *
+from app.server.db import DataBase
 
 
 
@@ -10,21 +11,24 @@ from app.rpc.ns import *
 @Pyro5.api.expose
 class Dispatcher:
     def __init__(self):
+        self.db = DataBase()
         self.requests: dict[int:str] = {}
         self.current_id = 0
         self.get_id = 0
 
         self.worker_prefix = 'worker-'
 
-    # FIX: is adding the request and taking the next job
-    def request(self, request: Tuple[str, List[str], List[str]] | Tuple[str, List[str]]):
-        self.add(request)
-        return self.dispatch_work()
+    # FIX: make it async
+    def request(self, request: Tuple):
+        results = self.db.execute(request)
+        return results
         
 
     def add(self, request: Tuple[str, List[str], List[str]] | Tuple[str, List[str]]):
-        self.requests[self.current_id] = request
-        self.current_id += 1
+        job_id = self.current_id + 1
+        self.current_id = job_id
+        self.requests[job_id] = request
+        return job_id
     
     def get(self) -> Tuple[int, Tuple[str, List[str], List[str]]] | Tuple[int, Tuple[str, List[str]]]:
         if self.requests.get(self.get_id) is None:
@@ -38,16 +42,15 @@ class Dispatcher:
         ns = locate_ns()
         return list(ns.list(prefix=self.worker_prefix).items())
     
-    def dispatch_work(self):
-        job = self.get()
+    # TODO: Tomar un job y decidir el o los workers que lo deben ejecutar
+    # TODO: Hacer db distribuida, dividoda en n grupos
+    # TODO: replicacion y consistencia, se debe resolver en el propio grupo
+    # NOTE: Cada server posee una db con los archivos que le pertenecen y con todos los tags de este
 
-        if job[1] is not None:
-            workers = self.workers()
-            worker_name = random.choice(workers)[0]
-            ns = Pyro5.api.locate_ns()
-
-            f = connect(ns, worker_name)
-            return f.execute(job[1])
-    
-
+    def dispatch(self, request):
+        if self.requests.get(self.get_id) is None:
+            return  None
+        request = self.requests.pop(id)
+        results = self.db.execute(request)
+        return results
 
