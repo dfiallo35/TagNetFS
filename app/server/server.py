@@ -118,13 +118,6 @@ class Server():
         self._server.register(self.node_name, self)
         self._server.register(self.worker_name, self._root)
         logging.info('Node: {} become worker\n'.format(self.node_name))
-    
-    def locate_ns(self):
-        try:
-            ns = locate_ns()
-        except Pyro5.errors.NamingError:
-            ns = None
-        return ns
 
 
     ########### ELECTIONS ###########
