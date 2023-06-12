@@ -8,25 +8,23 @@ from app.utils.thread import Kthread
 
 
 
+# TODO: commando add se manda solo a un grupo, los otros commandos se mandan a todos
+# TODO: Se debe esperar a que todas las db del grupo esten en el mismo tiempo o mandar el request solo a la mas actualizada
+# TODO: Thread para llevar las replicaciones de los grupos
+# TODO: variable bussy para saber si se esta usando el recurso
+# TODO: Llevar una cache de las request como cola de prioridad teniendo la request y el grupo que le corresponde, ejecutar en los no actualizados
+# TODO: copiar la db mas actualizada a los nodos nuevos
 
 
-# TODO: Create a model of distributed database
-# TODO: When leader is created, resolve the db from workers
 
-# TODO: divide by groups the workers to replicate the db
+
 # NOTE: the replication must be resolved between groups
 # TODO: When the number of grups decrease or grow is needed merge or split the groups db?
-
-# TODO: Solo se puede hacer una tarea a la vez por nodo
-# TODO: Create thread for bg replication
-
-# TODO: Create clock
 
 # TODO: what happend if a worker disconnect and then it reconnect to the network?
 
 # FIX: If you do add with the same file it can be copied to differents db
 
-# TODO: the request should be send to various nodes from the same group to do not lose it?
 
 class DataBase:
     def __init__(self) -> None:
@@ -145,7 +143,7 @@ class DataBase:
         timeout = self._timeout
         while True:
             try:
-                workers = self.best_workers()
+                workers = self.assign_workers()
                 self.assign_jobs(workers, request, job_id)
                 self.get_results(workers, job_id)
                 return self.merge_results(self.results[job_id])
@@ -153,13 +151,21 @@ class DataBase:
                 sleep(timeout)
                 timeout = increse_timeout(timeout)
 
-    # FIX: Method used to select what are the workers that should do the job
-    def best_workers(self):
+    
+    def assign_workers(self, request: Tuple):
         '''
         Select workers that should do the next job.
         '''
-        return [random.choice(x) for x in self.get_groups().values()]
+        groups = list(self.get_groups().values())
+        if request[0] == 'add':
+            return random.choice(groups)
+        else:
+            all = []
+            for i in groups:
+                all.extend(i)
+            return all
 
+    
     def assign_jobs(self, workers: List[Tuple], request: Tuple, id: int):
         '''
         Send the request to the workers.
