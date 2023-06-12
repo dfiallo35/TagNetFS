@@ -16,8 +16,8 @@ class Worker():
         self._group = None
         self._clock = 0
         self._job_id = 0
+        self._busy = False
         
-        self.running: Dict[int, Kthread] = {}
         self.results: Dict[int, dict] = {}
         self._timeout = 0.1
 
@@ -32,8 +32,15 @@ class Worker():
     def group(self):
         return self._group
     
+    @property
+    def busy(self):
+        return self._busy
+    
     def set_group(self, group: int):
         self._group = group
+    
+    def set_clock(self, id: int):
+        self._clock = id
     
     def get_result(self, id: int):
         if self.results.get(id) is not None:
@@ -43,10 +50,10 @@ class Worker():
     def join(self, id: int):
         timeout = self._timeout
         while True:
-            r = self.get_result(id)
-            print(r)
-            if r is not None:
-                return r
+            if not self.busy:
+                r = self.get_result(id)
+                if r is not None:
+                    return r
             sleep(self._timeout)
             timeout = increse_timeout(timeout)
     
@@ -58,15 +65,16 @@ class Worker():
     def run(self, request: Tuple, id: int):
         self._job_id = id
         print('set job ()...'.format(id), request)
-        self.running[id] = Kthread(
+        t = Kthread(
             target=self.execute,
             args=(request, id),
             daemon=True,
         )
-        self.running[id].start()
+        t.start()
     
 
     def execute(self, request: Tuple, id: int):
+        self._busy = True
         match request[0]:
             case 'add':
                 print('add executed...', end='\n')
@@ -85,4 +93,5 @@ class Worker():
                 self.results[id] =  delete_tags(request[1], request[2], self.get_db())
             case _:
                 print('Not job implemented')
+        self._busy = False
 

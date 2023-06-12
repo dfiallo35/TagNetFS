@@ -123,7 +123,7 @@ class Server():
         Run the elections loop.
         '''
         while True:
-            logging.info('Running election...\n')
+            # logging.info('Running election...\n')
             
             try:
                 if not self._coordinator or not self._coordinator.is_alive:
@@ -135,7 +135,7 @@ class Server():
             except Pyro5.errors.PyroError:
                 self.election()
             
-            logging.info('Election end\n')
+            # logging.info('Election end\n')
             sleep(self._timeout)
     
 
