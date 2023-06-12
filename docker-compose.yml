@@ -10,6 +10,8 @@ services:
         ipv4_address: 10.0.0.2
     expose:
       - 9090
+    ports:
+      - 8080:9090
   
   node-2:
     image: tagfs
@@ -20,6 +22,8 @@ services:
         ipv4_address: 10.0.0.3
     expose:
       - 9090
+    ports:
+      - 8081:9090
   
   node-3:
     image: tagfs
@@ -30,6 +34,8 @@ services:
         ipv4_address: 10.0.0.4
     expose:
       - 9090
+    ports:
+      - 8082:9090
   
   node-4:
     image: tagfs
@@ -40,6 +46,8 @@ services:
         ipv4_address: 10.0.0.5
     expose:
       - 9090
+    ports:
+      - 8083:9090
   
   node-5:
     image: tagfs
@@ -50,6 +58,8 @@ services:
         ipv4_address: 10.0.0.6
     expose:
       - 9090
+    ports:
+      - 8084:9090
   
   node-6:
     image: tagfs
@@ -60,6 +70,8 @@ services:
         ipv4_address: 10.0.0.7
     expose:
       - 9090
+    ports:
+      - 8085:9090
   
   node-7:
     image: tagfs
@@ -70,6 +82,8 @@ services:
         ipv4_address: 10.0.0.8
     expose:
       - 9090
+    ports:
+      - 8086:9090
   
   node-8:
     image: tagfs
@@ -80,6 +94,8 @@ services:
         ipv4_address: 10.0.0.9
     expose:
       - 9090
+    ports:
+      - 8087:9090
 
 networks:
   default:

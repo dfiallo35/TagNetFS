@@ -2,6 +2,9 @@ import sys
 import socket
 import logging
 import contextlib
+from time import sleep
+
+import Pyro5.errors
 from Pyro5 import config
 from Pyro5 import socketutil
 from Pyro5.api import Daemon
@@ -17,6 +20,8 @@ class Leader:
         self.id = ...
         self.IP = ip
         self.PORT = port
+
+        self._timeout = 10
 
         self.daemon = NameServerDaemon(self.IP, self.PORT)
         self.daemon_thread = Kthread(
@@ -35,6 +40,16 @@ class Leader:
         print("NS running on {}".format(str(self.daemon.locationStr)))
         print('URI = {}\n'.format(self.nsUri))
         sys.stdout.flush()
+
+        # PING
+        self._ping = Kthread(
+            target=self.ping_alive,
+            daemon=True
+        )
+        self._ping.start()
+    
+    def ping(self):
+        return 'OK'
     
     def request(self):
         try:
@@ -58,6 +73,25 @@ class Leader:
     def register(self, name: str, f):
         uri = self.daemon.register(f, force=True)
         self.daemon.nameserver.register(name, uri)
+    
+    def ping_alive(self):
+        '''
+        Ping all the workers and unregister the dead ones.
+        '''
+        while True:
+            try:
+                ns = locate_ns()
+                objects = list(ns.list().items())
+                for name, uri in objects:
+                    try:
+                        p = direct_connect(uri)
+                        p.ping()
+                    except Pyro5.errors.CommunicationError:
+                        print(f"Object {name} is not alive, unregistering...")
+                        ns.remove(name)
+                sleep(self._timeout)
+            except Pyro5.errors.NamingError:
+                sleep(self._timeout)
 
 
 
@@ -78,6 +112,9 @@ class Node:
         # TODO: what to do with ns
         self.ns: Proxy = locate_ns()
         print('Node connected to {}\n'.format(self.ns._pyroUri.host))
+    
+    def ping(self):
+        return 'OK'
     
     def request(self):
         try:
@@ -107,7 +144,6 @@ def locate_ns() -> Proxy:
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     with contextlib.suppress(Exception):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
-    # sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
     sock.settimeout(0.7)
     
     ns = []
@@ -139,7 +175,7 @@ def locate_ns() -> Proxy:
     with contextlib.suppress(OSError, socket.error):
         sock.shutdown(socket.SHUT_RDWR)
     sock.close()
-    return None
+    raise Pyro5.errors.NamingError
 
 
 def connect(ns: Proxy, name: str) -> Proxy:
@@ -149,3 +185,11 @@ def connect(ns: Proxy, name: str) -> Proxy:
     uri = ns.lookup(name)
     f = Proxy(uri)
     return f
+
+def direct_connect(uri: str):
+    '''
+    Get the element registered in the ns with the given uri.
+    '''
+    f = Proxy(uri)
+    return f
+    

@@ -1,4 +1,5 @@
 import os
+import math
 import hashlib
 from typing import List
 from fastapi import UploadFile
@@ -11,3 +12,7 @@ def hash(bits: int, host: str):
 
 def dirs_to_UploadFile(file_list: str):
     return [UploadFile(file=f, filename=n) for f, n in file_list]
+
+
+def increse_timeout(timeout: float):
+    return timeout * 2
