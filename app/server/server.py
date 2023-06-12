@@ -35,6 +35,7 @@ logging.basicConfig(
 
 # TODO: save a file with te node state?
 
+# TODO: Exception when there is no workers
 
 @Pyro5.api.expose
 class Server():
