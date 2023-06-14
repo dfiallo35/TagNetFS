@@ -13,7 +13,11 @@ from app.utils.utils import *
 class Worker():
     def __init__(self):
         self.database = DatabaseSession()
+        
         self._group = None
+        self._master = False
+        self._slaves = []
+        
         self._clock = 0
         self._job_id = 0
         self._busy = False
@@ -27,6 +31,10 @@ class Worker():
     @property
     def clock(self):
         return self._clock
+
+    @property
+    def master(self):
+        return self._master
     
     @property
     def group(self):
@@ -42,25 +50,16 @@ class Worker():
     def set_clock(self, id: int):
         self._clock = id
     
+    def set_master(self, master: bool):
+        self._master = master
+    
     def get_result(self, id: int):
         if self.results.get(id) is not None:
             return self.results.pop(id)
         return None
 
-    def join(self, id: int):
-        timeout = self._timeout
-        while True:
-            if not self.busy:
-                r = self.get_result(id)
-                if r is not None:
-                    return r
-            sleep(self._timeout)
-            timeout = increse_timeout(timeout)
-    
-
     def get_db(self):
         return self.database.get_db()
-    
 
     def run(self, request: Tuple, id: int):
         self._job_id = id
@@ -71,7 +70,6 @@ class Worker():
             daemon=True,
         )
         t.start()
-    
 
     def execute(self, request: Tuple, id: int):
         self._busy = True
@@ -94,4 +92,3 @@ class Worker():
             case _:
                 print('Not job implemented')
         self._busy = False
-

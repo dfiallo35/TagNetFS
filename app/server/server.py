@@ -26,6 +26,7 @@ logging.basicConfig(
 )
 
 
+# TODO: make leader the node with smaller ip
 
 # TODO: Differents logs
 
