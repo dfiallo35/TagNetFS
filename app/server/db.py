@@ -4,6 +4,7 @@ from typing import Tuple, List, Dict
 
 from app.rpc.ns import *
 from app.utils.utils import *
+from app.utils.constant import *
 from app.utils.thread import Kthread
 
 db_log = log('data-base', logging.DEBUG)
@@ -17,7 +18,7 @@ db_log = log('data-base', logging.DEBUG)
 # TODO: copiar la db mas actualizada a los nodos nuevos
 
 
-
+# TODO: Lock vars
 
 # NOTE: the replication must be resolved between groups
 # TODO: When the number of grups decrease or grow is needed merge or split the groups db?
@@ -67,31 +68,6 @@ class DataBase:
             except Pyro5.errors.NamingError:
                 sleep(timeout)
                 timeout = increse_timeout(timeout)
-
-
-    
-    
-    # TODO:
-    def group_masters(self):
-        '''
-        Get the list of masters.
-        '''
-        for group_workers in self.assign_groups():
-            ...
-
-
-    def merge_results(self, results: List[dict]):
-        '''
-        Merge all the results given by the workers.
-        '''
-        if results and results[0] and list(results[0].keys())[0] == 'messagge':
-            return {'messagge': 'correct'}
-        else:
-            r = {}
-            for i in results:
-                r.update(i)
-            return r
-    
     
     # FIX: TRY
     def execute(self, request: Tuple):
@@ -102,18 +78,19 @@ class DataBase:
         timeout = self._timeout
         while True:
             try:
-                # print('assign_workers...')
+                db_log.debug('excecute: assign_workers...')
                 workers = self.assign_workers(request)
-                # print('add_request_workers...')
+                
+                db_log.debug('excecute: add_request_workers...')
                 self.add_request_workers(job_id, workers)
-                # print('assign_jobs...')
-                # job_workers = self.get_workers_on_time(workers)
+                
+                db_log.debug('excecute: assign_jobs...')
                 self.assign_jobs(workers, request, job_id)
-                # print('get_results...')
+                
+                db_log.debug('excecute: get_results...')
                 self.get_results(workers, job_id)
-                # print('assign_clocks...')
-                # self.assign_clocks()
-                # print('results...')
+                
+                db_log.debug('excecute: results...')
                 return self.merge_results(self.results[job_id])
             except Pyro5.errors.PyroError:
                 sleep(timeout)
@@ -168,7 +145,7 @@ class DataBase:
                     # set the group
                     w.set_group(smaller)
                     # add the worker to the group list
-                    groups[smaller].append(worker)
+                    groups[smaller]['workers'].append(worker)
                     
                     # then add it to the group_len list
                     x = sorted_groups.pop(0)
@@ -179,24 +156,32 @@ class DataBase:
                 for group in groups:
                     if not groups[group]['master']:
                         groups[group]['master'] = random.choice(groups[group]['workers'])
+                        w = direct_connect(groups[group]['master'][1])
+                        for i in groups[group]['workers']:
+                            w.set_slave(i)
                 return groups
+            
             except Pyro5.errors.PyroError:
                 sleep(timeout)
                 timeout = increse_timeout(timeout)
     
-    # DELETE
+    # TODO:
+    def group_masters(self):
+        '''
+        Get the list of masters.
+        '''
+        return [g['master'] for g in self.assign_groups()]
+
     def assign_workers(self, request: Tuple):
         '''
         Select workers that should do the next job.
         '''
-        groups = list(self.assign_groups().values())
-        if request[0] == 'add':
-            return random.choice(groups)
+        groups = self.assign_groups()
+        if request[0] == ADD:
+            g = random.choice(list(groups.keys()))
+            return [groups[g]['master']]
         else:
-            all = []
-            for i in groups:
-                all.extend(i)
-            return all
+            return [g['master'] for g in groups.values()]
 
     # TODO: TRY
     def assign_jobs(self, workers: List[Tuple], request: Tuple, id: int):
@@ -204,34 +189,18 @@ class DataBase:
         Send the request to the workers.
         '''
         timeout = self._timeout
-        
         for worker in workers:
             w = direct_connect(worker[1])
             while True:
                 if not w.busy:
-                    db_log.info(f'assing jobs: send work to {worker}...\n')
+                    db_log.info(f'assing jobs: send work to {worker[0]}...\n')
                     w.run(request, id)
                     break
                 else:
                     sleep(self._timeout)
                     timeout = increse_timeout(timeout)
-    
-    def get_workers_on_time(self, workers: List):
-        t = 0
-        l = []
-        print(f'workers: {[y for _, y in workers]}')
-        for worker in workers:
-            w = direct_connect(worker[1])
-            print(worker[0], w.clock)
-            wt = w.clock
-            if wt > t:
-                t = wt
-                l = [worker]
-            elif w.clock == t:
-                l.append(worker)
-        print(f'workers left: {[y for _, y in l]}\n')
-        return l
 
+    # TODO: TRY
     # TODO: What to do with the losed request results
     def get_results(self, workers: List[Tuple], id: int):
         '''
@@ -241,56 +210,33 @@ class DataBase:
         self.results[id] = []
         for worker in workers:
             db_log.info(f'get results: wait responce from {worker[0]}...')
-            for _ in range(3):
-                try:
-                    w = direct_connect(worker[1])
-                    while True:
-                        if not w.busy:
-                            r = w.get_result(id)
-                            if r is not None:
-                                db_log.info(f'results: {r}\n')
-                                self.results[id].append(r)
+            try:
+                w = direct_connect(worker[1])
+                while True:
+                    if not w.busy:
+                        r = w.get_result(id)
+                        if r is not None:
+                            db_log.info(f'results: {r}\n')
+                            self.results[id].append(r)
+                            break
+                    else:
                         sleep(self._timeout)
                         timeout = increse_timeout(timeout)
-                except Pyro5.errors.PyroError:
-                    pass
+            except Pyro5.errors.PyroError:
+                pass
     
-    # TODO: disconected nodes
-    def replicate(self):
-        while True:
-            smaller_time = float('inf')
-            workers_behind = []
-            workers = self.workers()
-            for worker in workers:
-                try:
-                    w = direct_connect(worker[1])
-                    if w.clock < smaller_time:
-                        smaller_time = w.clock
-                        workers_behind = [worker]
-                    elif w.clock == smaller_time:
-                        workers_behind.append(worker)
-                except Pyro5.errors.PyroError:
-                    pass
-            if workers_behind:
-                db_log.info(f'replicate: workers_behind: {workers_behind}...')
-                ids = sorted(self._requests.keys())
-                for worker in workers_behind:
-                    try:
-                        w = direct_connect(worker[1])
-                        if not w.busy and ids:
-                            id = ids[0]
-                            if w.clock >= id:
-                                db_log.info(f'replicate: delete {id}')
-                                self._requests.pop(id)
-                            else:
-                                if worker in self._requests[id]['workers']:
-                                    db_log.info(f'replicate: assign job to {worker[0]}...')
-                                    self.assign_jobs(worker, self._requests[id]['request'], id)
-                                else:
-                                    w.set_clock(id)
-                    except Pyro5.errors.PyroError:
-                        pass
-            db_log.info('replicate: sleep...\n')
-            sleep(2)
+    def merge_results(self, results: List[dict]):
+        '''
+        Merge all the results given by the workers.
+        '''
+        if results and results[0] and list(results[0].keys())[0] == 'messagge':
+            return {'messagge': 'correct'}
+        else:
+            r = {}
+            for i in results:
+                r.update(i)
+            return r
+    
+    
 
                 

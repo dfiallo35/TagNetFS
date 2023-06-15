@@ -15,7 +15,7 @@ class Dispatcher:
         self.worker_prefix = 'worker-'
 
     def ping(self):
-        return 'OK'
+        return PING
 
     # FIX: make it async?
     # FIX: TRY

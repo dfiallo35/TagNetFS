@@ -17,13 +17,13 @@ from app.server.dispatcher import Dispatcher
 
 
 # Create and configure logger
-logging.basicConfig(
-    # filename="server.log",
-    # encoding='utf-8',
-    # filemode='w',
-    format='%(asctime)s %(message)s',
-    level=logging.DEBUG
-)
+# logging.basicConfig(
+#     filename="server.log",
+#     encoding='utf-8',
+#     filemode='w',
+#     format='%(asctime)s %(message)s',
+#     level=logging.DEBUG
+# )
 
 
 # TODO: make leader the node with smaller ip
@@ -45,7 +45,7 @@ class Server():
         self._port = 9090
         self._id = hash(nbits, self._host)
         self._nbits = nbits
-        logging.info('Node name: {}'.format(self.node_name))
+        # logging.info('Node name: {}'.format(self.node_name))
 
         self._alive = True
         self._timeout: int = 10
@@ -105,7 +105,7 @@ class Server():
         self._root = Dispatcher()
         self._server.register('leader', self)
         self._server.register('request', self._root)
-        logging.info('Node: {} become leader\n'.format(self.node_name))
+        # logging.info('Node: {} become leader\n'.format(self.node_name))
 
     def become_node(self):
         self.kill()
@@ -113,7 +113,7 @@ class Server():
         self._root = Worker()
         self._server.register(self.node_name, self)
         self._server.register(self.worker_name, self._root)
-        logging.info('Node: {} become worker\n'.format(self.node_name))
+        # logging.info('Node: {} become worker\n'.format(self.node_name))
 
 
     ########### ELECTIONS ###########
@@ -181,7 +181,7 @@ class Server():
         try:
             if self._coordinator.id == self.id:
                 self.become_leader()
-                logging.info("Node {} is the new coordinator".format(self.node_name))
+                # logging.info("Node {} is the new coordinator".format(self.node_name))
             else:
                 self.become_node()
         except Pyro5.errors.PyroError:
@@ -200,5 +200,5 @@ class Server():
             self._server = None
     
     def ping(self):
-        return 'OK'
+        return PING
 

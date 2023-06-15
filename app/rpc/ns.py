@@ -12,6 +12,7 @@ from Pyro5.client import Proxy
 from Pyro5.nameserver import NameServerDaemon, BroadcastServer
 
 from app.utils.thread import Kthread
+from app.utils.constant import *
 
 
 
@@ -49,7 +50,7 @@ class Leader:
         self._ping.start()
     
     def ping(self):
-        return 'OK'
+        return PING
     
     def request(self):
         try:
@@ -114,7 +115,7 @@ class Node:
         print('Node connected to {}\n'.format(self.ns._pyroUri.host))
     
     def ping(self):
-        return 'OK'
+        return PING
     
     def request(self):
         try:
