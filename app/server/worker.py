@@ -21,6 +21,7 @@ class Worker():
         self._group = None
         self._master = False
         self._slaves = []
+        self._replicate: Kthread = None
         
         self._job_id = 0
         self._busy = False
@@ -59,6 +60,15 @@ class Worker():
     
     # FIX
     def set_master(self, master: bool):
+        if master:
+            self._replicate = Kthread(
+                target=self.replicate,
+                daemon=True
+            )
+            self._replicate.start()
+        else:
+            if self._replicate:
+                self._replicate.kill()
         self._master = master
     
     def set_slave(self, slave: Tuple):
@@ -107,6 +117,7 @@ class Worker():
     
 
     # TODO: disconected nodes
+    # TODO: wait responce
     def replicate(self):
         while True:
             for slave in self.slaves:
@@ -117,8 +128,10 @@ class Worker():
                         if w_clock+1 in self._requests:
                             if not w.busy:
                                 if self._requests[w_clock+1][0] == ADD:
+                                    print(f'replicate: run add\n')
                                     w.run(self._requests[w_clock+1], w_clock+1)
                                 else:
+                                    print(f'replicate: set clock\n')
                                     w.set_clock(w_clock+1)
                         else:
                             # TODO

@@ -1,4 +1,5 @@
 import random
+# import pandas as pd
 from time import sleep
 from typing import Tuple, List, Dict
 
@@ -7,30 +8,16 @@ from app.utils.utils import *
 from app.utils.constant import *
 from app.utils.thread import Kthread
 
-db_log = log('data-base', logging.DEBUG)
+db_log = log('data-base', logging.INFO)
 
 
-# TODO: commando add se manda solo a un grupo, los otros commandos se mandan a todos
-# TODO: Se debe esperar a que todas las db del grupo esten en el mismo tiempo o mandar el request solo a la mas actualizada
-# TODO: Thread para llevar las replicaciones de los grupos
-# TODO: variable bussy para saber si se esta usando el recurso
-# TODO: Llevar una cache de las request como cola de prioridad teniendo la request y el grupo que le corresponde, ejecutar en los no actualizados
-# TODO: copiar la db mas actualizada a los nodos nuevos
 
 
 # TODO: Lock vars
-
-# NOTE: the replication must be resolved between groups
 # TODO: When the number of grups decrease or grow is needed merge or split the groups db?
-
 # TODO: what happend if a worker disconnect and then it reconnect to the network?
-
 # FIX: If you do add with the same file it can be copied to differents db
-
 # TODO: if dont get responce from server, repeat the requets to other server from the same group
-
-# TODO: increse the clock of the workers that are right on time in add
-
 # TODO: Master-slave distributed db
 
 class DataBase:
@@ -38,9 +25,7 @@ class DataBase:
         self._job_id = 0
         self._requests = {}
 
-        # TODO: variate
         self._groups_len = 2
-        self._groups_number = 2
         self._timeout = 0.1
         
         # TODO: cache
@@ -49,11 +34,7 @@ class DataBase:
         self.results: Dict[int, List[dict]] = {}
         self.worker_prefix = 'worker-'
 
-        # self._replicate = Kthread(
-        #     target=self.replicate,
-        #     daemon=True
-        # )
-        # self._replicate.start()
+        
     
     # OK
     def workers(self):
@@ -104,6 +85,7 @@ class DataBase:
             self._requests[id]['workers'] = workers.copy()
     
     # TODO: Use self.groups as cache
+    # FIX: What to do when there are more then one master in a group
     # FIX: Can loose db in decrease the number or workers
     def assign_groups(self) -> Dict:
         '''
@@ -125,6 +107,7 @@ class DataBase:
                         workers_without_group.append(worker)
                     else:
                         if not groups.get(worker_group):
+                            # FIX
                             w.set_group = None
                             workers_without_group.append(worker)
                         elif worker_master:
@@ -157,6 +140,7 @@ class DataBase:
                     if not groups[group]['master']:
                         groups[group]['master'] = random.choice(groups[group]['workers'])
                         w = direct_connect(groups[group]['master'][1])
+                        w.set_master(True)
                         for i in groups[group]['workers']:
                             w.set_slave(i)
                 return groups
@@ -172,11 +156,19 @@ class DataBase:
         '''
         return [g['master'] for g in self.assign_groups()]
 
+    # def print_groups(self, groups):
+    #     g = {id:{w['master'][0]:[i[0] for i in w['workers']]} for id, w in groups}
+    #     df = pd.DataFrame(g).transpose()
+    #     print()
+    #     print(g)
+    #     print()
+
     def assign_workers(self, request: Tuple):
         '''
         Select workers that should do the next job.
         '''
         groups = self.assign_groups()
+        print('groups', {id:{w['master'][0]:[i[0] for i in w['workers']]} for id, w in zip(groups.keys(), groups.values())}, '\n')
         if request[0] == ADD:
             g = random.choice(list(groups.keys()))
             return [groups[g]['master']]

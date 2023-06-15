@@ -29,12 +29,13 @@ def log(
         file: str = None
     ) -> logging.Logger:
     logger = logging.getLogger(name)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s')
+    formatter = logging.Formatter('%(name)s - %(message)s')
     logger.setLevel(level)
     if file:
+        file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s')
         fh = logging.FileHandler(file)
         fh.setLevel(file_level)
-        fh.setFormatter(formatter)
+        fh.setFormatter(file_formatter)
         logger.addHandler(fh)
     
     ch = logging.StreamHandler()
