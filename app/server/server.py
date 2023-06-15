@@ -1,6 +1,7 @@
 import socket
 import logging
 from time import sleep
+from threading import Lock
 
 import Pyro5.api
 import Pyro5.server
@@ -17,26 +18,12 @@ from app.server.dispatcher import Dispatcher
 server_log = log('server', logging.INFO)
 
 
-# Create and configure logger
-# logging.basicConfig(
-#     filename="server.log",
-#     encoding='utf-8',
-#     filemode='w',
-#     format='%(asctime)s %(message)s',
-#     level=logging.DEBUG
-# )
-
 
 # TODO: make leader the node with smaller ip
-
 # TODO: Differents logs
-
 # TODO: file for configs
-
 # TODO: change the needed try to repeat the proces n times if exception
-
 # TODO: save a file with te node state?
-
 # TODO: Exception when there is no workers
 
 @Pyro5.api.expose
@@ -57,6 +44,10 @@ class Server():
         self._server = None
         self._root = None
 
+        # LOCKS
+        self.lock_elections = Lock()
+
+
     
     @property
     def id(self):
@@ -69,6 +60,10 @@ class Server():
     @property
     def port(self):
         return self._port
+    
+    @property
+    def timeout(self):
+        return self._timeout
 
     @property
     def node_name(self):
@@ -84,7 +79,13 @@ class Server():
 
     @property
     def in_elections(self):
-        return self._in_elections
+        with self.lock_elections:
+            return self._in_elections
+    
+    @in_elections.setter
+    def in_elections(self, elections: bool):
+        with self.lock_elections:
+            self._in_elections = elections
     
 
     def run(self):
@@ -102,7 +103,7 @@ class Server():
 
     def become_leader(self):
         self.kill()
-        self._server = Leader(self._host, self._port)
+        self._server = Leader(self.host, self.port)
         self._root = Dispatcher()
         self._server.register('leader', self)
         self._server.register('request', self._root)
@@ -110,7 +111,7 @@ class Server():
 
     def become_node(self):
         self.kill()
-        self._server = Node(self._host, self._port)
+        self._server = Node(self.host, self.port)
         self._root = Worker()
         self._server.register(self.node_name, self)
         self._server.register(self.worker_name, self._root)
@@ -138,7 +139,7 @@ class Server():
                 self.election()
             
             # logging.info('Election end\n')
-            sleep(self._timeout)
+            sleep(self.timeout)
     
 
     def find_coordinator(self):
@@ -175,7 +176,7 @@ class Server():
         '''
         Go elections.
         '''
-        self._in_elections = True
+        self.in_elections = True
         coordinator = self.find_coordinator()
         self._coordinator = coordinator
         
@@ -187,7 +188,7 @@ class Server():
                 self.become_node()
         except Pyro5.errors.PyroError:
             self.election()
-        self._in_elections = False
+        self.in_elections = False
 
     
     def kill(self):

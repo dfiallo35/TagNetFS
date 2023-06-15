@@ -1,14 +1,19 @@
 import Pyro5.api
 import Pyro5.errors
 from time import sleep
+from threading import Lock
 from typing import Tuple, List, Dict
 
 from app.database.api import *
 from app.utils.constant import *
-from app.utils.utils import dirs_to_UploadFile
+from app.utils.utils import *
 from app.utils.thread import Kthread
 from app.utils.utils import *
 from app.rpc.ns import *
+
+
+
+worker_log = log('worker', logging.INFO)
 
 
 
@@ -17,6 +22,8 @@ class Worker():
     def __init__(self):
         self.database = DatabaseSession()
         self._requests = {}
+        self.results: Dict[int, dict] = {}
+        self._timeout = 0.1
         
         self._group = None
         self._master = False
@@ -26,40 +33,33 @@ class Worker():
         self._job_id = 0
         self._busy = False
         
-        self.results: Dict[int, dict] = {}
-        self._timeout = 0.1
+        # LOCKS
+        self.lock_clock = Lock()
+        self.lock_busy = Lock()
+        self.lock_slaves = Lock()
+        self.lock_requests = Lock()
+        
 
     def ping(self):
         return PING
 
     @property
     def clock(self):
-        return self._job_id
+        with self.lock_clock:
+            return self._job_id
+
+    @clock.setter
+    def clock(self, clock: int):
+        with self.lock_clock:
+            self._job_id = clock
 
     @property
     def master(self):
         return self._master
 
-    @property
-    def slaves(self):
-        return self._slaves
-    
-    @property
-    def group(self):
-        return self._group
-    
-    @property
-    def busy(self):
-        return self._busy
-    
-    def set_group(self, group: int):
-        self._group = group
-    
-    def set_clock(self, id: int):
-        self._job_id = id
-    
     # FIX
-    def set_master(self, master: bool):
+    @master.setter
+    def master(self, master: bool):
         if master:
             self._replicate = Kthread(
                 target=self.replicate,
@@ -70,10 +70,44 @@ class Worker():
             if self._replicate:
                 self._replicate.kill()
         self._master = master
+
+    @property
+    def slaves(self):
+        with self.lock_slaves:
+            return self._slaves
     
-    def set_slave(self, slave: Tuple):
-        if slave not in self._slaves:
-            self._slaves.append(slave)
+    @slaves.setter
+    def slaves(self, slaves: List[Tuple]):
+        with self.lock_slaves:
+            self._slaves = slaves
+    
+    @property
+    def group(self):
+        return self._group
+    
+    @group.setter
+    def group(self, group: int):
+        self._group = group
+    
+    @property
+    def busy(self):
+        with self.lock_busy:
+            return self._busy
+    
+    @busy.setter
+    def busy(self, busy: bool):
+        with self.lock_busy:
+            self._busy = busy
+    
+    @property
+    def requests(self):
+        with self.lock_requests:
+            return self._requests
+    
+    @requests.setter
+    def requests(self, request: Tuple, id: int):
+        with self.lock_requests:
+            self._requests[id] = request
     
     def get_result(self, id: int):
         if self.results.get(id) is not None:
@@ -85,7 +119,7 @@ class Worker():
 
     def run(self, request: Tuple, id: int):
         self._job_id = id
-        self._requests[id] = request
+        self.requests[id] = request
         t = Kthread(
             target=self.execute,
             args=(request, id),
@@ -94,45 +128,56 @@ class Worker():
         t.start()
 
     def execute(self, request: Tuple, id: int):
-        self._busy = True
+        self.busy = True
         match request[0]:
             case 'add':
-                print('add executed...', end='\n')
+                worker_log.info('add executed...\n')
                 self.results[id] = add(dirs_to_UploadFile(request[1]), request[2], self.get_db())
             case 'delete':
-                print('delete executed...', end='\n')
+                worker_log.info('delete executed...\n')
                 self.results[id] =  delete(request[1], self.get_db())
             case 'list':
-                print('list executed...', end='\n')
+                worker_log.info('list executed...\n')
                 self.results[id] =  qlist(request[1], self.get_db())
             case 'add-tags':
-                print('add-tags executed...', end='\n')
+                worker_log.info('add-tags executed...\n')
                 self.results[id] =  add_tags(request[1], request[2], self.get_db())
             case 'delete-tags':
-                print('delete-tags executed...', end='\n')
+                worker_log.info('delete-tags executed...\n')
                 self.results[id] =  delete_tags(request[1], request[2], self.get_db())
             case _:
                 print('Not job implemented')
-        self._busy = False
+        self.busy = False
     
 
     # TODO: disconected nodes
-    # TODO: wait responce
     def replicate(self):
         while True:
             for slave in self.slaves:
                 try:
                     w = direct_connect(slave[1])
                     w_clock = w.clock
+                    next_clock = w_clock+1
                     if w_clock < self.clock:
-                        if w_clock+1 in self._requests:
+                        if next_clock in self._requests:
                             if not w.busy:
-                                if self._requests[w_clock+1][0] == ADD:
+                                if self._requests[next_clock][0] == ADD:
                                     print(f'replicate: run add\n')
-                                    w.run(self._requests[w_clock+1], w_clock+1)
+                                    w.run(self._requests[next_clock], next_clock)
+                                    
+                                    # Wait responce
+                                    timeout = self._timeout
+                                    while True:
+                                        if not w.busy:
+                                            r = w.get_result(next_clock)
+                                            if r is not None:
+                                                break
+                                        else:
+                                            sleep(self._timeout)
+                                            timeout = increse_timeout(timeout)
                                 else:
                                     print(f'replicate: set clock\n')
-                                    w.set_clock(w_clock+1)
+                                    w.clock = next_clock
                         else:
                             # TODO
                             ...
