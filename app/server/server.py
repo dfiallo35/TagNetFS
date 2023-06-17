@@ -62,6 +62,10 @@ class Server():
         return self._port
     
     @property
+    def coordinator(self):
+        return self._coordinator
+
+    @property
     def timeout(self):
         return self._timeout
 
@@ -129,11 +133,11 @@ class Server():
             # logging.info('Running election...\n')
             
             try:
-                if not self._coordinator or not self._coordinator.is_alive:
+                if not self.coordinator or not self.coordinator.is_alive:
                     self.election()
                 else:
                     ns = locate_ns()
-                    if ns and ns._pyroUri.host != self._coordinator.host:
+                    if ns and ns._pyroUri.host != self.coordinator.host:
                         self.election()
             except Pyro5.errors.PyroError:
                 self.election()
@@ -147,7 +151,7 @@ class Server():
         Find the coordinator.
         '''
         try:
-            if not self._coordinator or not self._coordinator.is_alive:
+            if not self.coordinator or not self.coordinator.is_alive:
                 try:
                     ns = locate_ns()
                     coordinator = connect(ns, 'leader')
@@ -157,7 +161,7 @@ class Server():
             else:
                 try:
                     ns = locate_ns()
-                    if ns and ns._pyroUri.host != self._coordinator.host:
+                    if ns and ns._pyroUri.host != self.coordinator.host:
                         coordinator = connect(ns, 'leader')
                         return coordinator
                 except Pyro5.errors.NamingError:

@@ -5,6 +5,7 @@ from threading import Lock
 from typing import Tuple, List, Dict
 
 from app.database.api import *
+from app.database.crud import *
 from app.utils.constant import *
 from app.utils.utils import *
 from app.utils.thread import Kthread
@@ -16,6 +17,7 @@ from app.rpc.ns import *
 worker_log = log('worker', logging.INFO)
 
 
+# FIX: different id than db class
 
 @Pyro5.api.expose
 class Worker():
@@ -38,7 +40,16 @@ class Worker():
         self.lock_busy = Lock()
         self.lock_slaves = Lock()
         self.lock_requests = Lock()
-        
+    
+    @property
+    def status(self):
+        status = {
+            'clock':self.clock,
+            'group':self.group,
+            'master':self.master,
+            'slaves':[s[0] for s in self.slaves],
+        }
+        return status
 
     def ping(self):
         return PING
@@ -105,8 +116,9 @@ class Worker():
             return self._requests
     
     @requests.setter
-    def requests(self, request: Tuple, id: int):
+    def requests(self, id_request: Tuple):
         with self.lock_requests:
+            id, request = id_request
             self._requests[id] = request
     
     def get_result(self, id: int):
@@ -116,10 +128,21 @@ class Worker():
 
     def get_db(self):
         return self.database.get_db()
+    
+    def export_db(self, n: int):
+        worker_log.info('export db...\n')
+        return divide_db(self.get_db(), n)
+    
+    def import_db(self, files):
+        worker_log.info('import files...\n')
+        save_files(self.get_db(), files)
+    
+    def clear_db(self):
+        clear_db(self.get_db())
 
     def run(self, request: Tuple, id: int):
-        self._job_id = id
-        self.requests[id] = request
+        self.clock = self.clock + 1
+        self.requests = (self.clock, request)
         t = Kthread(
             target=self.execute,
             args=(request, id),
@@ -159,11 +182,11 @@ class Worker():
                     w_clock = w.clock
                     next_clock = w_clock+1
                     if w_clock < self.clock:
-                        if next_clock in self._requests:
+                        if next_clock in self.requests:
                             if not w.busy:
-                                if self._requests[next_clock][0] == ADD:
+                                if self.requests[next_clock][0] == ADD:
                                     print(f'replicate: run add\n')
-                                    w.run(self._requests[next_clock], next_clock)
+                                    w.run(self.requests[next_clock], next_clock)
                                     
                                     # Wait responce
                                     timeout = self._timeout

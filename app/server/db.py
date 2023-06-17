@@ -13,14 +13,9 @@ from app.utils.thread import Kthread
 db_log = log('data-base', logging.INFO)
 
 
-
-
-# TODO: Lock vars
-# TODO: When the number of grups decrease or grow is needed merge or split the groups db?
-# TODO: what happend if a worker disconnect and then it reconnect to the network?
-# FIX: If you do add with the same file it can be copied to differents db
+# FIX: list before add
 # TODO: if dont get responce from server, repeat the requets to other server from the same group
-# TODO: Master-slave distributed db
+
 
 class DataBase:
     def __init__(self) -> None:
@@ -108,8 +103,18 @@ class DataBase:
                 sleep(timeout)
                 timeout = increse_timeout(timeout)
     
-    # FIX: What to do when there are more then one master in a group
-    # FIX: Can loose db in decrease the number or workers
+    def workers_status(self):
+        workers = self.workers()
+        print('--------------------------------------------------')
+        for worker in workers:
+            w = direct_connect(worker[1])
+            print(worker[0])
+            status: dict = w.status
+            for i in status.keys():
+                print(f'  {i}: {status[i]}')
+            print()
+        print('--------------------------------------------------')
+
     def assign_groups(self) -> Dict:
         '''
         Get a dictionary of group:list[workers].
@@ -119,7 +124,7 @@ class DataBase:
             try:
                 workers = self.workers()
                 if workers:
-                    groups = {i:{'master': None, 'workers': []} for i in range(1, ceil(len(workers)/self._groups_len)+1)}
+                    groups = {i:{'master': None, 'workers': []} for i in range(1, divide(len(workers), self._groups_len)+1)}
 
                     # Find workers without groups
                     workers_without_group = []
@@ -139,34 +144,33 @@ class DataBase:
                                 groups[worker_group]['workers'].append(worker)
                     
                     # Assign group to workers
-                    sorted_groups = [(group, len(groups[group]['workers'])) for group in groups]
                     for worker in workers_without_group:
-                        sorted_groups = sorted(sorted_groups, key=lambda x: x[1])
-                        # get the smaller group
+                        sorted_groups = sorted([(group, len(groups[group]['workers'])) for group in groups], key=lambda x: x[1])
                         smaller = sorted_groups[0][0]
-                        
-                        # connect to the current worker
-                        w = direct_connect(worker[1])
-                        # set the group
-                        w.group = smaller
-                        # add the worker to the group list
                         groups[smaller]['workers'].append(worker)
-                        
-                        # then add it to the group_len list
-                        x = sorted_groups.pop(0)
-                        x = (x[0], x[1]+1)
-                        sorted_groups.append(x)
+                    
+                    # Move from group
+                    while True:
+                        if len(groups) >=2:
+                            sorted_groups = sorted([(group, len(groups[group]['workers'])) for group in groups], key=lambda x: x[1])
+                            first = sorted_groups[0]
+                            last = sorted_groups[-1]
+                            if first[1] < self._groups_len and last[1] > self._groups_len:
+                                worker = random.choice(groups[last[0]]['workers'])
+                                groups[last[0]]['workers'].remove(worker)
+                                groups[first[0]]['workers'].append(worker)
+                            else:
+                                break
+                        else:
+                            break
 
                     # Assign master to groups
                     for group in groups:
                         if not groups[group]['master']:
-                            groups[group]['master'] = random.choice(groups[group]['workers'])
+                            groups[group]['master'] = random.choice([i for i in groups[group]['workers'] if i != groups[group]['master']])
                     
                     # Update nodes
                     if groups != self.groups:
-                        self.groups = groups
-                        print('groups', {id:{w['master'][0]:[i[0] for i in w['workers']]} for id, w in zip(groups.keys(), groups.values())}, '\n')
-                        
                         for group in groups:
                             w = direct_connect(groups[group]['master'][1])
                             w.group = group
@@ -174,15 +178,27 @@ class DataBase:
                             w.slaves = [i for i in groups[group]['workers'] if i != groups[group]['master']]
                             for i in groups[group]['workers']:
                                 w = direct_connect(i[1])
-                                w.group = group
-                
+                                if i != groups[group]['master']:
+                                    w.slaves = []
+                                    w.master = False
+                                w_group =  w.group
+                                if w_group:
+                                    if w_group != group:
+                                        w.group = group
+                                        files = w.export_db(len(list(groups.keys())))
+                                        for f, g in zip(files, groups.values()):
+                                            master  = direct_connect(g['master'][1])
+                                            master.import_db(f)
+                                else:
+                                    w.group = group
+                        self.groups = groups
+                        self.workers_status()
                 sleep(self._timeout_groups)
             
             except Pyro5.errors.PyroError:
                 sleep(timeout)
                 timeout = increse_timeout(timeout)
     
-    # TODO:
     def group_masters(self):
         '''
         Get the list of masters.
