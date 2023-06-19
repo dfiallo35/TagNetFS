@@ -111,7 +111,7 @@ class Server():
         self._root = Dispatcher()
         self._server.register('leader', self)
         self._server.register('request', self._root)
-        server_log.info('Node: {} become leader\n'.format(self.node_name))
+        server_log.info('Node: {} become leader'.format(self.node_name))
 
     def become_node(self):
         self.kill()
@@ -187,7 +187,7 @@ class Server():
         try:
             if self._coordinator.id == self.id:
                 self.become_leader()
-                server_log.info("Node {} is the new coordinator".format(self.node_name))
+                server_log.info("Node {} is the new coordinator\n".format(self.node_name))
             else:
                 self.become_node()
         except Pyro5.errors.PyroError:

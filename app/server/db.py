@@ -67,14 +67,13 @@ class DataBase:
     def execute(self, request: Tuple):
         id = self.job_id + 1
         self.job_id = id
-        self.add_request(request, id)
-
         timeout = self.timeout
         while True:
             try:
-                workers = self.assign_workers(request)
-                self.add_request_workers(id, workers)
-                self.assign_jobs(workers, request, id)
+                requests = self.assign_workers(request)
+                self.add_request(requests, id)
+                self.assign_jobs(requests, request, id)
+                # TODO: list comprehention for request workers
                 self.get_results(workers, id)
                 result = self.merge_results(self.results[id])
                 return result
@@ -82,13 +81,9 @@ class DataBase:
                 sleep(timeout)
                 timeout = increse_timeout(timeout)
 
-    def add_request(self, request: Tuple, id: int):
-        self._requests[id] = {'request':request, 'workers': []}
-    
-    def add_request_workers(self, id: int, workers: List):
-        db_log.debug('excecute: add_request_workers...')
-        if self._requests.get(id):
-            self._requests[id]['workers'] = workers.copy()
+    # FIX
+    def add_request(self, requests: Tuple, id: int):
+        self._requests[id] = requests
     
     def workers(self):
         '''
@@ -124,6 +119,7 @@ class DataBase:
             try:
                 workers = self.workers()
                 if workers:
+                    # FIX: 
                     groups = {i:{'master': None, 'workers': []} for i in range(1, divide(len(workers), self._groups_len)+1)}
 
                     # Find workers without groups
@@ -205,36 +201,69 @@ class DataBase:
         '''
         return [g['master'] for g in self.groups]
 
+    def locate_file(self, workers: List[Tuple], file_name: str):
+        for worker in workers:
+            w = direct_connect(worker[1])
+            # CHECK:
+            located_file = w.locate_file(file_name)
+            if located_file:
+                return worker
+        return None
+
+    # FIX: not separated request for the same worker
     def assign_workers(self, request: Tuple):
         '''
         Select workers that should do the next job.
         '''
         db_log.debug('excecute: assign_workers...')
-        groups = self.groups
+        workers = self.group_masters()
         if request[0] == ADD:
-            g = random.choice(list(groups.keys()))
-            return [groups[g]['master']]
+            rewrite: Dict[Tuple, List] = {}
+            add = []
+            for f in request[1]:
+                worker = self.locate_file(workers, f[1])
+                if worker:
+                    if not rewrite.get(worker):
+                        rewrite[worker] = []
+                    else:
+                        rewrite[worker].append(f)      
+                else:
+                    add.append(f)
+            
+            if add:
+                w = random.choice(workers)
+                if w in rewrite:
+                    rewrite[w].extend(add.copy())
+                    add = []
+                else:
+                    add = [([w], (request[0], [f for f in add], request[2]))]
+            
+            requests = [([w], (request[0], [f for f in j] , request[2])) for w, j in zip(rewrite.keys(), rewrite.values())]
+            if add:
+                requests.extend(add)
+            
+            return requests
         else:
-            return [g['master'] for g in groups.values()]
+            return [(workers, request)]
 
     # TODO: TRY
-    # FIX: random add
-    def assign_jobs(self, workers: List[Tuple], request: Tuple, id: int):
+    def assign_jobs(self, requests: List[Tuple], id: int):
         '''
         Send the request to the workers.
         '''
         db_log.debug('excecute: assign_jobs...')
         timeout = self.timeout
-        for worker in workers:
-            w = direct_connect(worker[1])
-            while True:
-                if not w.busy:
-                    db_log.info(f'assing jobs: send work to {worker[0]}...\n')
-                    w.run(request, id)
-                    break
-                else:
-                    sleep(self.timeout)
-                    timeout = increse_timeout(timeout)
+        for workers, request in requests:
+            for worker in workers:
+                w = direct_connect(worker[1])
+                while True:
+                    if not w.busy:
+                        db_log.info(f'assing jobs: send work to {worker[0]}...\n')
+                        w.run(request, id)
+                        break
+                    else:
+                        sleep(self.timeout)
+                        timeout = increse_timeout(timeout)
 
     # TODO: TRY
     # TODO: What to do with the losed request results

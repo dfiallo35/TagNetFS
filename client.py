@@ -35,7 +35,7 @@ def delete(
 
 
 @app.command('list')
-def qist(
+def qlist(
     tag_query: List[str] = typer.Option(..., '-q', '--tag-query'),
 ):
     Client.run((LIST, tag_query))

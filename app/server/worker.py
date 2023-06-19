@@ -137,6 +137,9 @@ class Worker():
         worker_log.info('import files...\n')
         save_files(self.get_db(), files)
     
+    def locate_file(self, file_name: str):
+        return get_files_by_name(self.get_db(), file_name)
+    
     def clear_db(self):
         clear_db(self.get_db())
 
@@ -169,7 +172,7 @@ class Worker():
                 worker_log.info('delete-tags executed...\n')
                 self.results[id] =  delete_tags(request[1], request[2], self.get_db())
             case _:
-                print('Not job implemented')
+                worker_log.info('Not job implemented\n')
         self.busy = False
     
 
@@ -202,8 +205,9 @@ class Worker():
                                     print(f'replicate: set clock\n')
                                     w.clock = next_clock
                         else:
-                            # TODO
-                            ...
+                            worker_log.info(f'replicate: Copy all db to {slave[0]}...\n')
+                            files = self.export_db(1)[0]
+                            w.import_db(files)
                 except Pyro5.errors.PyroError:
                     pass
             sleep(self._timeout)
