@@ -137,11 +137,15 @@ class Worker():
         worker_log.info('import files...\n')
         save_files(self.get_db(), files)
     
-    def locate_file(self, file_name: str):
-        return get_files_by_name(self.get_db(), file_name)
-    
     def clear_db(self):
         clear_db(self.get_db())
+    
+    def locate_file(self, file_name: str):
+        print('locate...')
+        file = get_files_by_name(self.get_db(), file_name)
+        if file:
+            return True
+        return False
 
     def run(self, request: Tuple, id: int):
         self.clock = self.clock + 1

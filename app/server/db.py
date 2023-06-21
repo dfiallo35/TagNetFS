@@ -13,7 +13,7 @@ from app.utils.thread import Kthread
 db_log = log('data-base', logging.INFO)
 
 
-# FIX: list before add
+# FIX: What to do with existent db
 # TODO: if dont get responce from server, repeat the requets to other server from the same group
 
 
@@ -72,9 +72,9 @@ class DataBase:
             try:
                 requests = self.assign_workers(request)
                 self.add_request(requests, id)
-                self.assign_jobs(requests, request, id)
+                self.assign_jobs(requests, id)
                 # TODO: list comprehention for request workers
-                self.get_results(workers, id)
+                self.get_results(requests, id)
                 result = self.merge_results(self.results[id])
                 return result
             except Pyro5.errors.PyroError:
@@ -169,9 +169,19 @@ class DataBase:
                     if groups != self.groups:
                         for group in groups:
                             w = direct_connect(groups[group]['master'][1])
-                            w.group = group
+                            w_group =  w.group
+                            if w_group:
+                                if w_group != group:
+                                    w.group = group
+                                    files = w.export_db(len(list(groups.keys())))
+                                    for f, g in zip(files, groups.values()):
+                                        master = direct_connect(g['master'][1])
+                                        master.import_db(f)
+                            else:
+                                w.group = group
                             w.master = True
                             w.slaves = [i for i in groups[group]['workers'] if i != groups[group]['master']]
+                            
                             for i in groups[group]['workers']:
                                 w = direct_connect(i[1])
                                 if i != groups[group]['master']:
@@ -181,10 +191,7 @@ class DataBase:
                                 if w_group:
                                     if w_group != group:
                                         w.group = group
-                                        files = w.export_db(len(list(groups.keys())))
-                                        for f, g in zip(files, groups.values()):
-                                            master  = direct_connect(g['master'][1])
-                                            master.import_db(f)
+                                        w.clear_db()
                                 else:
                                     w.group = group
                         self.groups = groups
@@ -199,18 +206,19 @@ class DataBase:
         '''
         Get the list of masters.
         '''
-        return [g['master'] for g in self.groups]
+        return [self.groups[g]['master'] for g in self.groups.keys()]
 
     def locate_file(self, workers: List[Tuple], file_name: str):
+        db_log.debug('execute: locate file...')
         for worker in workers:
             w = direct_connect(worker[1])
             # CHECK:
             located_file = w.locate_file(file_name)
+            
             if located_file:
                 return worker
         return None
 
-    # FIX: not separated request for the same worker
     def assign_workers(self, request: Tuple):
         '''
         Select workers that should do the next job.
@@ -224,7 +232,7 @@ class DataBase:
                 worker = self.locate_file(workers, f[1])
                 if worker:
                     if not rewrite.get(worker):
-                        rewrite[worker] = []
+                        rewrite[worker] = [f]
                     else:
                         rewrite[worker].append(f)      
                 else:
@@ -237,11 +245,9 @@ class DataBase:
                     add = []
                 else:
                     add = [([w], (request[0], [f for f in add], request[2]))]
-            
             requests = [([w], (request[0], [f for f in j] , request[2])) for w, j in zip(rewrite.keys(), rewrite.values())]
             if add:
                 requests.extend(add)
-            
             return requests
         else:
             return [(workers, request)]
@@ -267,29 +273,30 @@ class DataBase:
 
     # TODO: TRY
     # TODO: What to do with the losed request results
-    def get_results(self, workers: List[Tuple], id: int):
+    def get_results(self, requests: List[Tuple], id: int):
         '''
         Wait for the results.
         '''
         db_log.debug('excecute: get_results...')
         timeout = self.timeout
         self.results[id] = []
-        for worker in workers:
-            db_log.info(f'get results: wait responce from {worker[0]}...')
-            try:
-                w = direct_connect(worker[1])
-                while True:
-                    if not w.busy:
-                        r = w.get_result(id)
-                        if r is not None:
-                            db_log.info(f'results: {r}\n')
-                            self.results[id].append(r)
-                            break
-                    else:
-                        sleep(self.timeout)
-                        timeout = increse_timeout(timeout)
-            except Pyro5.errors.PyroError:
-                pass
+        for workers, _ in requests:
+            for worker in workers:
+                db_log.info(f'get results: wait responce from {worker[0]}...')
+                try:
+                    w = direct_connect(worker[1])
+                    while True:
+                        if not w.busy:
+                            r = w.get_result(id)
+                            if r is not None:
+                                db_log.info(f'results: {r}\n')
+                                self.results[id].append(r)
+                                break
+                        else:
+                            sleep(self.timeout)
+                            timeout = increse_timeout(timeout)
+                except Pyro5.errors.PyroError:
+                    pass
     
     def merge_results(self, results: List[dict]):
         '''

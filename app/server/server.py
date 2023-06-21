@@ -36,7 +36,7 @@ class Server():
         server_log.info('Node name: {}'.format(self.node_name))
 
         self._alive = True
-        self._timeout: int = 10
+        self._timeout: int = 1
         self._in_elections = False
         self._elections: Kthread = None
         self._coordinator: Server = None
