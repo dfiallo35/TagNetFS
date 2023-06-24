@@ -13,10 +13,10 @@ from Pyro5.nameserver import NameServerDaemon, BroadcastServer
 
 from app.utils.thread import Kthread
 from app.utils.constant import *
+from app.server.base_server import BaseServer
 
 
-
-class Leader:
+class Leader(BaseServer):
     def __init__(self, ip: str, port: str):
         self.id = ...
         self.IP = ip
@@ -43,11 +43,11 @@ class Leader:
         sys.stdout.flush()
 
         # PING
-        self._ping = Kthread(
+        self._ping_thread = Kthread(
             target=self.ping_alive,
             daemon=True
         )
-        self._ping.start()
+        self._ping_thread.start()
     
     def ping(self):
         return PING
@@ -56,6 +56,7 @@ class Leader:
         try:
             self.daemon.requestLoop()
         finally:
+            self.daemon.shutdown()
             self.daemon.close()
             if self.bcserver is not None:
                 self.bcserver.close()
@@ -65,11 +66,25 @@ class Leader:
         self.daemon_thread.start()
     
     def kill_daemon(self):
-        # self.daemon.shutdown()
-        self.daemon.close()
-        if self.bcserver is not None:
-            self.bcserver.close()
-        self.daemon_thread.join()
+        try:
+            self.daemon.shutdown()
+            self.daemon.close()
+            if self.bcserver is not None:
+                self.bcserver.close()
+        except:
+            pass
+        
+    
+    def kill_threads(self):
+        try:
+            self.daemon_thread.kill()
+            if self.daemon_thread.is_alive():
+                self.daemon_thread.join()
+            self._ping_thread.kill()
+            if self._ping_thread.is_alive():
+                self._ping_thread.join()
+        except:
+            pass
     
     def register(self, name: str, f):
         uri = self.daemon.register(f, force=True)
@@ -96,7 +111,7 @@ class Leader:
 
 
 
-class Node:
+class Node(BaseServer):
     def __init__(self, ip: str, port: int):
         self.id = ...
         self.IP = ip
@@ -128,9 +143,18 @@ class Node:
         self.daemon_thread.start()
     
     def kill_daemon(self):
-        # self.daemon.shutdown()
-        self.daemon.close()
-        self.daemon_thread.join()
+        try:
+            self.daemon.close()
+        except:
+            pass
+    
+    def kill_threads(self):
+        try:
+            self.daemon_thread.kill()
+            if self.daemon_thread.is_alive():
+                self.daemon_thread.join()
+        except:
+            pass
     
     # FIX: update ns?
     def register(self, name: str, f):

@@ -11,7 +11,7 @@ from app.utils.utils import *
 from app.utils.thread import Kthread
 from app.utils.utils import *
 from app.rpc.ns import *
-
+from app.server.base_server import BaseServer
 
 
 worker_log = log('worker', logging.INFO)
@@ -20,7 +20,7 @@ worker_log = log('worker', logging.INFO)
 # FIX: different id than db class
 
 @Pyro5.api.expose
-class Worker():
+class Worker(BaseServer):
     def __init__(self):
         self.database = DatabaseSession()
         self._requests = {}
@@ -30,7 +30,7 @@ class Worker():
         self._group = None
         self._master = False
         self._slaves = []
-        self._replicate: Kthread = None
+        self.replicate_thread: Kthread = None
         
         self._job_id = 0
         self._busy = False
@@ -72,14 +72,14 @@ class Worker():
     @master.setter
     def master(self, master: bool):
         if master:
-            self._replicate = Kthread(
+            self.replicate_thread = Kthread(
                 target=self.replicate,
                 daemon=True
             )
-            self._replicate.start()
+            self.replicate_thread.start()
         else:
-            if self._replicate:
-                self._replicate.kill()
+            if self.replicate_thread:
+                self.replicate_thread.kill()
         self._master = master
 
     @property
@@ -179,6 +179,11 @@ class Worker():
                 worker_log.info('Not job implemented\n')
         self.busy = False
     
+    def kill_threads(self):
+        try:
+            self.replicate_thread.kill()
+        except:
+            pass
 
     # TODO: disconected nodes
     def replicate(self):

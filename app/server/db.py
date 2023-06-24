@@ -32,11 +32,11 @@ class DataBase:
         self._groups_len = 2
         self._timeout_groups = 2
         self._groups: Dict[int, Dict[str, List|Tuple]] = {}
-        self._assign_froups = Kthread(
+        self.groups_thread = Kthread(
             target=self.assign_groups,
             daemon=True,
         )
-        self._assign_froups.start()
+        self.groups_thread.start()
 
         # LOCKS
         self.lock_id = Lock()

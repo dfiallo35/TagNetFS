@@ -26,6 +26,9 @@ server_log = log('server', logging.INFO)
 # TODO: save a file with te node state?
 # TODO: Exception when there is no workers
 
+# FIX: kill ktreads
+# FIX: running threads
+
 @Pyro5.api.expose
 class Server():
     def __init__(self, nbits: int = 8):
@@ -36,9 +39,9 @@ class Server():
         server_log.info('Node name: {}'.format(self.node_name))
 
         self._alive = True
-        self._timeout: int = 1
+        self._timeout: int = 2
         self._in_elections = False
-        self._elections: Kthread = None
+        self.elections_thread: Kthread = None
         self._coordinator: Server = None
         
         self._server = None
@@ -96,11 +99,11 @@ class Server():
         '''
         Run the node.
         '''
-        self._elections = Kthread(
+        self.elections_thread = Kthread(
             target=self.run_elections,
             daemon=True
         )
-        self._elections.start()
+        self.elections_thread.start()
 
         while True: ...
 
@@ -202,10 +205,12 @@ class Server():
         '''
         try:
             self._server.kill_daemon()
+            self._server.kill_threads()
             self._server = None
-        except:
-            self._server = None
+            self._root.kill_threads()
+            self._root = None
+        except AttributeError:
+            pass
     
     def ping(self):
         return PING
-
