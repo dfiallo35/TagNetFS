@@ -2,6 +2,7 @@ from os import makedirs
 from sqlalchemy.orm import Session
 
 from . import models, schemas, tools
+from app.utils.utils import *
 
 
 
@@ -55,3 +56,35 @@ def get_files_by_tag_query(db: Session, tag_query: list):
     return files
 
 
+def get_files_by_name(db: Session, file_name: str):
+    '''
+    Get file by name.
+    '''
+    file = db.query(models.File).filter(models.File.name == file_name).first()
+    return file
+
+def all_files(db: Session):
+    '''
+    Get all data from db by file and his tags.
+    '''
+    files = db.query(models.File).all()
+    return files
+
+def divide_db(db: Session, pieces: int):
+    '''
+    Divide all the db in n pieces.
+    '''
+    files = split(all_files(db), pieces)
+    return files
+
+def save_files(db: Session, files: List[models.File]):
+    '''
+    Save in the db the file list and his tags.
+    '''
+    for file in files:
+        db.add(file)
+        db.commit()
+        db.refresh(file)
+
+def clear_db(db: Session):
+    db.query(models.File).delete()

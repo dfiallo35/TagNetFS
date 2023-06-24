@@ -6,16 +6,13 @@ from app.rpc.ns import *
 from app.server.db import DataBase
 
 
-
-
 @Pyro5.api.expose
 class Dispatcher:
     def __init__(self):
         self.db = DataBase()
-        self.worker_prefix = 'worker-'
 
     def ping(self):
-        return 'OK'
+        return PING
 
     # FIX: make it async?
     # FIX: TRY

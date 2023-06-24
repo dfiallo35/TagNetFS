@@ -4,6 +4,7 @@ from typing import List
 
 from app.utils.utils import *
 from app.client.client import Client
+from app.utils.constant import *
 
 
 
@@ -23,21 +24,21 @@ def add(
         with open(i, 'r') as f:
             files.append((f.read(), os.path.basename(i)))
     
-    Client.run(('add', files, tag_list))
+    Client.run((ADD, files, tag_list))
 
 
 @app.command()
 def delete(
     tag_query: List[str] = typer.Option(..., '-q', '--tag-query'),
 ):
-    Client.run(('delete', tag_query))
+    Client.run((DELETE, tag_query))
 
 
 @app.command('list')
-def qist(
+def qlist(
     tag_query: List[str] = typer.Option(..., '-q', '--tag-query'),
 ):
-    Client.run(('list', tag_query))
+    Client.run((LIST, tag_query))
 
 
 @app.command()
@@ -45,7 +46,7 @@ def add_tags(
     tag_query: List[str] = typer.Option(..., '-q', '--tag-query'),
     tag_list: List[str] = typer.Option(..., '-t', '--tag-list'),
 ):
-    Client.run(('add-tags', tag_query, tag_list))
+    Client.run((ADD_TAGS, tag_query, tag_list))
 
 
 @app.command()
@@ -53,7 +54,7 @@ def delete_tags(
     tag_query: List[str] = typer.Option(..., '-q', '--tag-query'),
     tag_list: List[str] = typer.Option(..., '-t', '--tag-list'),
 ):
-    Client.run(('delete-tags', tag_query, tag_list))
+    Client.run((DELETE_TAGS, tag_query, tag_list))
 
 
 
