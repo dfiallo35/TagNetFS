@@ -6,8 +6,6 @@ from app.rpc.ns import *
 from app.server.db import DataBase
 from app.server.base_server import BaseServer
 
-
-
 @Pyro5.api.expose
 class Dispatcher(BaseServer):
     def __init__(self):
