@@ -15,7 +15,6 @@ from app.utils.thread import Kthread
 from app.utils.constant import *
 
 
-
 class Leader:
     def __init__(self, ip: str, port: str):
         self.id = ...
@@ -32,12 +31,13 @@ class Leader:
         self.daemon_thread.start()
 
         self.nsUri = self.daemon.uriFor(self.daemon.nameserver)
-        self.internalUri = self.daemon.uriFor(self.daemon.nameserver, nat=False)
+        self.internalUri = self.daemon.uriFor(
+            self.daemon.nameserver, nat=False)
 
         self.bcserver = BroadcastServer(self.nsUri)
         print("Broadcast server running on {}".format(self.bcserver.locationStr))
         self.bcserver.runInThread()
-        
+
         print("NS running on {}".format(str(self.daemon.locationStr)))
         print('URI = {}\n'.format(self.nsUri))
         sys.stdout.flush()
@@ -48,10 +48,10 @@ class Leader:
             daemon=True
         )
         self._ping.start()
-    
+
     def ping(self):
         return PING
-    
+
     def request(self):
         try:
             self.daemon.requestLoop()
@@ -60,21 +60,21 @@ class Leader:
             if self.bcserver is not None:
                 self.bcserver.close()
         print("NS shut down.")
-    
+
     def run_daemon(self):
         self.daemon_thread.start()
-    
+
     def kill_daemon(self):
         # self.daemon.shutdown()
         self.daemon.close()
         if self.bcserver is not None:
             self.bcserver.close()
         self.daemon_thread.join()
-    
+
     def register(self, name: str, f):
         uri = self.daemon.register(f, force=True)
         self.daemon.nameserver.register(name, uri)
-    
+
     def ping_alive(self):
         '''
         Ping all the workers and unregister the dead ones.
@@ -95,7 +95,6 @@ class Leader:
                 sleep(self._timeout)
 
 
-
 class Node:
     def __init__(self, ip: str, port: int):
         self.id = ...
@@ -113,10 +112,10 @@ class Node:
         # TODO: what to do with ns
         self.ns: Proxy = locate_ns()
         print('Node connected to {}\n'.format(self.ns._pyroUri.host))
-    
+
     def ping(self):
         return PING
-    
+
     def request(self):
         try:
             self.daemon.requestLoop()
@@ -126,28 +125,27 @@ class Node:
 
     def run_daemon(self):
         self.daemon_thread.start()
-    
+
     def kill_daemon(self):
         # self.daemon.shutdown()
         self.daemon.close()
         self.daemon_thread.join()
-    
+
     # FIX: update ns?
     def register(self, name: str, f):
         uri = self.daemon.register(f, force=True)
         self.ns.register(name, uri)
 
 
-
 def locate_ns() -> Proxy:
     port = config.NS_BCPORT
-    
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     with contextlib.suppress(Exception):
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
     sock.settimeout(0.7)
-    
+
     ns = []
     for _ in range(3):
         try:
@@ -188,10 +186,10 @@ def connect(ns: Proxy, name: str) -> Proxy:
     f = Proxy(uri)
     return f
 
+
 def direct_connect(uri: str):
     '''
     Get the element registered in the ns with the given uri.
     '''
     f = Proxy(uri)
     return f
-    
