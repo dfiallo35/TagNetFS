@@ -189,6 +189,7 @@ class Server():
                 self.become_leader()
                 server_log.info("Node {} is the new coordinator\n".format(self.node_name))
             else:
+                # FIX: if alredy worker?
                 self.become_node()
         except Pyro5.errors.PyroError:
             self.election()

@@ -22,7 +22,7 @@ class Leader:
         self.IP = ip
         self.PORT = port
 
-        self._timeout = 10
+        self._timeout = 1
 
         self.daemon = NameServerDaemon(self.IP, self.PORT)
         self.daemon_thread = Kthread(
@@ -131,7 +131,8 @@ class Node:
         # self.daemon.shutdown()
         self.daemon.close()
         self.daemon_thread.join()
-
+    
+    # FIX: update ns?
     def register(self, name: str, f):
         uri = self.daemon.register(f, force=True)
         self.ns.register(name, uri)

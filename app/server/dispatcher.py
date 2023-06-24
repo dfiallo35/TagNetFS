@@ -12,7 +12,6 @@ from app.server.db import DataBase
 class Dispatcher:
     def __init__(self):
         self.db = DataBase()
-        self.worker_prefix = 'worker-'
 
     def ping(self):
         return PING

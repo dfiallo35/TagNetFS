@@ -13,6 +13,9 @@ from app.utils.thread import Kthread
 db_log = log('data-base', logging.INFO)
 
 
+# TODO: when copy db also copy files
+# TODO: move db in worker
+
 # FIX: What to do with existent db
 # TODO: if dont get responce from server, repeat the requets to other server from the same group
 
@@ -73,7 +76,6 @@ class DataBase:
                 requests = self.assign_workers(request)
                 self.add_request(requests, id)
                 self.assign_jobs(requests, id)
-                # TODO: list comprehention for request workers
                 self.get_results(requests, id)
                 result = self.merge_results(self.results[id])
                 return result
@@ -310,10 +312,3 @@ class DataBase:
             for i in results:
                 r.update(i)
             return r
-    
-    # def print_groups(self, groups):
-    #     g = {id:{w['master'][0]:[i[0] for i in w['workers']]} for id, w in groups}
-    #     df = pd.DataFrame(g).transpose()
-    #     print()
-    #     print(g)
-    #     print()
