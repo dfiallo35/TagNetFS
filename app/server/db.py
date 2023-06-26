@@ -34,11 +34,6 @@ class DataBase:
         self._timeout_groups = 2
         self._groups: Dict[int, Dict[str, Tuple|List[Tuple]]] = {}
         self._group_workers = set()
-        # self.groups_thread = Kthread(
-        #     target=self.assign_groups,
-        #     daemon=True,
-        # )
-        # self.groups_thread.start()
 
         # LOCKS
         self.lock_id = Lock()
@@ -76,11 +71,12 @@ class DataBase:
                         w = direct_connect(worker[1])
                         group = w.group
                         master = w.master
-                        if groups.get(group):
-                            groups[group]['master'] = master
-                            groups[group]['workers'].append(worker)
-                        else:
-                            groups[group] = {'master':master, 'workers':[worker]}
+                        if group:
+                            if groups.get(group):
+                                groups[group]['master'] = master
+                                groups[group]['workers'].append(worker)
+                            else:
+                                groups[group] = {'master':master, 'workers':[worker]}
                     except Pyro5.errors.PyroError:
                         pass
                 self._groups = groups
@@ -112,10 +108,11 @@ class DataBase:
         '''
         return [self.groups[g]['master'] for g in self.groups.keys()]
     
-    # FIX: actualize the workers
+    
     def regroup(self, group: int, worker: Tuple):
         # If the worker alredy has a group assigned
         if group:
+            # TODO: move workers from others groups if there is only one in this
             workers_alive = self.groups[group].copy()
             master = workers_alive['master']
             workers = workers_alive['workers'].copy()
@@ -142,28 +139,31 @@ class DataBase:
         
         # Assign a group to worker
         else:
-            groups = sorted(list(self.groups.keys()))
+            groups = self.groups.copy()    
             if groups:
-                last_group = groups[-1]
-                if len(self.groups[last_group]['workers']) < self.groups_len:
-                    self.groups[last_group]['workers'].append(worker)
+                sorted_groups = sorted([(group, len(self.groups[group]['workers'])) for group in groups.keys()], key=lambda x: x[1])
+                current_group = sorted_groups[0][0]
+                if len(self.groups[current_group]['workers']) < self.groups_len:
+                    self.groups[current_group]['workers'].append(worker)
                     # Add worker as slave to group master
                     added = False
                     while not added:
                         try:
-                            m = direct_connect(self.groups[last_group]['master'][1])
+                            m = direct_connect(self.groups[current_group]['master'][1])
                             m.slaves = worker
                             added = True
                         except Pyro5.errors.PyroError:
                             sleep(self.timeout)
-                    return last_group, self.groups[last_group]['master'], []
+                    return current_group, self.groups[current_group]['master'], []
                 else:
-                    new_group = last_group + 1
+                    new_group = current_group + 1
                     self.groups[new_group] = {'master':worker, 'workers':[worker]}
                     return new_group, worker, []
             else:
+                print('no group...')
                 new_group = 1
                 self.groups[new_group] = {'master':worker, 'workers':[worker]}
+                print('end no group...')
                 return new_group, worker, []
 
     # FIX: TRY

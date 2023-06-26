@@ -244,7 +244,6 @@ class Worker(BaseServer):
         except:
             pass
 
-    # TODO: disconected nodes
     # FIX
     def replicate(self):
         for slave in self.slaves:
