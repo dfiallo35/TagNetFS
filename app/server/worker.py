@@ -37,7 +37,7 @@ class Worker(BaseServer):
         self._group = None
         self._master = None
         self._slaves = []
-        self.replicate_thread: Kthread = None
+        self._background_thread: Kthread = None
         
         self._job_id = 0
         self._busy = False
@@ -45,6 +45,7 @@ class Worker(BaseServer):
         # LOCKS
         self.lock_clock = Lock()
         self.lock_busy = Lock()
+        self.lock_master = Lock()
         self.lock_slaves = Lock()
         self.lock_requests = Lock()
 
@@ -82,21 +83,14 @@ class Worker(BaseServer):
 
     @property
     def master(self):
-        return self._master
+        with self.lock_master:
+            return self._master
 
     # FIX
     @master.setter
     def master(self, master: bool):
-        # if master:
-        #     self.replicate_thread = Kthread(
-        #         target=self.replicate,
-        #         daemon=True
-        #     )
-        #     self.replicate_thread.start()
-        # else:
-        #     if self.replicate_thread:
-        #         self.replicate_thread.kill()
-        self._master = master
+        with self.lock_master:
+            self._master = master
 
     @property
     def slaves(self):
@@ -104,11 +98,13 @@ class Worker(BaseServer):
             return self._slaves
 
     @slaves.setter
-    def slaves(self, slave: Tuple):
+    def slaves(self, slaves: Tuple|List[Tuple]):
         with self.lock_slaves:
-            self._slaves.append(slave)
-            self._slaves = list(set(self._slaves))
-
+            if isinstance(slaves, Tuple):
+                self._slaves.append(slaves)
+                self._slaves = list(set(self._slaves))
+            else:
+                self._slaves = slaves
 
     @property
     def group(self):
@@ -139,29 +135,47 @@ class Worker(BaseServer):
             id, request = id_request
             self._requests[id] = request
     
-
+    # FIX: kill thread for leader
     def register_worker(self):
-        registered = False
-        while not registered:
+        while not self.group:
             try:
-                ns = locate_ns()
-                db = connect(ns, 'db')
-                group, master = db.register_worker(self.worker)
-                self.group = group
-                self.master = master
-
-                # If not master, inform master that is slave
-                if self.master != self.worker:
-                    m = direct_connect(master[1])
-                    m.slaves = self.worker
-                
-                db.workers_status()
-                registered = True
+                self.regroup()
+                self._background_thread = Kthread(
+                    target=self.background,
+                    daemon=True
+                )
+                self._background_thread.start()
             except Pyro5.errors.PyroError:
                 sleep(self._timeout)
     
+    def regroup(self):
+        ns = locate_ns()
+        db = connect(ns, 'db')
+        group, master, slaves = db.regroup(self.group, self.worker)
+        self.group = group
+        if master == self.worker:
+            for slave in slaves:
+                try:
+                    s = direct_connect(slave[1])
+                    s.master = master
+                except Pyro5.errors.PyroError:
+                    pass
+        self.master = master
+        self.slaves = slaves
+        db.workers_status()
+
     def background(self):
-        ...
+        while True:
+            if self.master != self.worker:
+                try:
+                    m = direct_connect(self.master[1])
+                    m.ping()
+                except Pyro5.errors.PyroError:
+                    self.regroup()
+            else:
+                self.replicate()
+            sleep(1)
+
 
     def get_result(self, id: int):
         if self.results.get(id) is not None:
@@ -226,46 +240,43 @@ class Worker(BaseServer):
     
     def kill_threads(self):
         try:
-            self.replicate_thread.kill()
+            self._background_thread.kill()
         except:
             pass
 
     # TODO: disconected nodes
     # FIX
     def replicate(self):
-        while True:
-            for slave in self.slaves:
-                try:
-                    w = direct_connect(slave[1])
-                    w_clock = w.clock
-                    next_clock = w_clock+1
-                    if w_clock < self.clock:
-                        if next_clock in self.requests:
-                            if not w.busy:
-                                if self.requests[next_clock][0] == ADD:
-                                    print(f'replicate: run add\n')
-                                    w.run(
-                                        self.requests[next_clock], next_clock)
+        for slave in self.slaves:
+            try:
+                w = direct_connect(slave[1])
+                w_clock = w.clock
+                next_clock = w_clock+1
+                if w_clock < self.clock:
+                    if next_clock in self.requests:
+                        if not w.busy:
+                            if self.requests[next_clock][0] == ADD:
+                                print(f'replicate: run add\n')
+                                w.run(
+                                    self.requests[next_clock], next_clock)
 
-                                    # Wait responce
-                                    timeout = self._timeout
-                                    while True:
-                                        if not w.busy:
-                                            r = w.get_result(next_clock)
-                                            if r is not None:
-                                                break
-                                        else:
-                                            sleep(self._timeout)
-                                            timeout = increse_timeout(timeout)
-                                else:
-                                    print(f'replicate: set clock\n')
-                                    w.clock = next_clock
-                        else:
-                            worker_log.info(
-                                f'replicate: Copy all db to {slave[0]}...\n')
-                            files = self.export_db(1)[0]
-                            w.import_db(files)
-                except Pyro5.errors.PyroError:
-                    pass
-            sleep(self._timeout)
-            sleep(self._timeout)
+                                # Wait responce
+                                timeout = self._timeout
+                                while True:
+                                    if not w.busy:
+                                        r = w.get_result(next_clock)
+                                        if r is not None:
+                                            break
+                                    else:
+                                        sleep(self._timeout)
+                                        timeout = increse_timeout(timeout)
+                            else:
+                                print(f'replicate: set clock\n')
+                                w.clock = next_clock
+                    else:
+                        worker_log.info(
+                            f'replicate: Copy all db to {slave[0]}...\n')
+                        files = self.export_db(1)[0]
+                        w.import_db(files)
+            except Pyro5.errors.PyroError:
+                self.regroup()

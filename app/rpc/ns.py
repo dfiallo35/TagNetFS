@@ -103,7 +103,7 @@ class Leader(BaseServer):
                     try:
                         p = direct_connect(uri)
                         p.ping()
-                    except Pyro5.errors.CommunicationError:
+                    except Pyro5.errors.PyroError:
                         print(f"Object {name} is not alive, unregistering...")
                         ns.remove(name)
                 sleep(self._timeout)

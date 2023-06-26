@@ -32,7 +32,7 @@ class DataBase:
         # GROUPS
         self._groups_len = 2
         self._timeout_groups = 2
-        self._groups: Dict[int, List[Tuple]] = {}
+        self._groups: Dict[int, Dict[str, Tuple|List[Tuple]]] = {}
         self._group_workers = set()
         # self.groups_thread = Kthread(
         #     target=self.assign_groups,
@@ -68,6 +68,22 @@ class DataBase:
     @property
     def groups(self):
         with self.lock_groups:
+            if not self._groups:
+                workers = self.workers
+                groups = {}
+                for worker in workers:
+                    try:
+                        w = direct_connect(worker[1])
+                        group = w.group
+                        master = w.master
+                        if groups.get(group):
+                            groups[group]['master'] = master
+                            groups[group]['workers'].append(worker)
+                        else:
+                            groups[group] = {'master':master, 'workers':[worker]}
+                    except Pyro5.errors.PyroError:
+                        pass
+                self._groups = groups
             return self._groups
 
     @groups.setter
@@ -96,22 +112,59 @@ class DataBase:
         '''
         return [self.groups[g]['master'] for g in self.groups.keys()]
     
+    # FIX: actualize the workers
+    def regroup(self, group: int, worker: Tuple):
+        # If the worker alredy has a group assigned
+        if group:
+            workers_alive = self.groups[group].copy()
+            master = workers_alive['master']
+            workers = workers_alive['workers'].copy()
 
-    def register_worker(self, worker: Tuple):
-        groups = sorted(list(self.groups.keys()))
-        if groups:
-            last_group = groups[-1]
-            if len(self.groups[last_group]['workers']) < self.groups_len:
-                self.groups[last_group]['workers'].append(worker)
-                return last_group, self.groups[last_group]['master']
+            for check_worker in workers:
+                if check_worker != worker:
+                    try:
+                        w = direct_connect(check_worker[1])
+                        w.ping()
+                    except Pyro5.errors.PyroError:
+                        workers_alive['workers'].remove(check_worker)
+            if worker != master:
+                try:
+                    m = direct_connect(master[1])
+                    m.ping()
+                except Pyro5.errors.PyroError:
+                    workers_alive['master'] = worker
+            
+            self.groups[group] = workers_alive
+            if worker == workers_alive['master']:
+                return group, workers_alive['master'], [x for x in workers_alive['workers'] if x != worker]
             else:
-                new_group = last_group + 1
-                self.groups[new_group] = {'master':worker, 'workers':[worker]}
-                return new_group, worker
+                return group, workers_alive['master'], []
+        
+        # Assign a group to worker
         else:
-            new_group = 1
-            self.groups[new_group] = {'master':worker, 'workers':[worker]}
-            return new_group, worker
+            groups = sorted(list(self.groups.keys()))
+            if groups:
+                last_group = groups[-1]
+                if len(self.groups[last_group]['workers']) < self.groups_len:
+                    self.groups[last_group]['workers'].append(worker)
+                    # Add worker as slave to group master
+                    added = False
+                    while not added:
+                        try:
+                            m = direct_connect(self.groups[last_group]['master'][1])
+                            m.slaves = worker
+                            added = True
+                        except Pyro5.errors.PyroError:
+                            sleep(self.timeout)
+                    return last_group, self.groups[last_group]['master'], []
+                else:
+                    new_group = last_group + 1
+                    self.groups[new_group] = {'master':worker, 'workers':[worker]}
+                    return new_group, worker, []
+            else:
+                new_group = 1
+                self.groups[new_group] = {'master':worker, 'workers':[worker]}
+                return new_group, worker, []
 
     # FIX: TRY
     def execute(self, request: Tuple):
@@ -134,7 +187,6 @@ class DataBase:
     def add_request(self, requests: Tuple, id: int):
         self._requests[id] = requests    
 
-    # FIX
     def workers_status(self):
         workers = self.workers
         print('--------------------------------------------------')
