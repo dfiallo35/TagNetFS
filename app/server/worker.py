@@ -21,14 +21,21 @@ worker_log = log('worker', logging.INFO)
 
 @Pyro5.api.expose
 class Worker(BaseServer):
-    def __init__(self):
+    def __init__(self, host: str, port: int, id: int):
+        self.host = host
+        self.port = port
+        self.id = id
+
+        self._worker_uri = generate_worker_uri(self.id, self.host, self.port)
+        self.worker_name = f'worker-{id}'
+
         self.database = DatabaseSession()
         self._requests = {}
         self.results: Dict[int, dict] = {}
         self._timeout = 0.1
 
         self._group = None
-        self._master = False
+        self._master = None
         self._slaves = []
         self.replicate_thread: Kthread = None
         
@@ -41,18 +48,27 @@ class Worker(BaseServer):
         self.lock_slaves = Lock()
         self.lock_requests = Lock()
 
+    def ping(self):
+        return PING
+
     @property
     def status(self):
         status = {
             'clock': self.clock,
             'group': self.group,
-            'master': self.master,
+            'master': self.master[0],
             'slaves': [s[0] for s in self.slaves],
         }
         return status
+    
+    @property
+    def worker(self):
+        return (self.worker_name, self.worker_uri)
 
-    def ping(self):
-        return PING
+    @property
+    def worker_uri(self):
+        return self._worker_uri
+    
 
     @property
     def clock(self):
@@ -71,15 +87,15 @@ class Worker(BaseServer):
     # FIX
     @master.setter
     def master(self, master: bool):
-        if master:
-            self.replicate_thread = Kthread(
-                target=self.replicate,
-                daemon=True
-            )
-            self.replicate_thread.start()
-        else:
-            if self.replicate_thread:
-                self.replicate_thread.kill()
+        # if master:
+        #     self.replicate_thread = Kthread(
+        #         target=self.replicate,
+        #         daemon=True
+        #     )
+        #     self.replicate_thread.start()
+        # else:
+        #     if self.replicate_thread:
+        #         self.replicate_thread.kill()
         self._master = master
 
     @property
@@ -88,9 +104,11 @@ class Worker(BaseServer):
             return self._slaves
 
     @slaves.setter
-    def slaves(self, slaves: List[Tuple]):
+    def slaves(self, slave: Tuple):
         with self.lock_slaves:
-            self._slaves = slaves
+            self._slaves.append(slave)
+            self._slaves = list(set(self._slaves))
+
 
     @property
     def group(self):
@@ -120,6 +138,30 @@ class Worker(BaseServer):
         with self.lock_requests:
             id, request = id_request
             self._requests[id] = request
+    
+
+    def register_worker(self):
+        registered = False
+        while not registered:
+            try:
+                ns = locate_ns()
+                db = connect(ns, 'db')
+                group, master = db.register_worker(self.worker)
+                self.group = group
+                self.master = master
+
+                # If not master, inform master that is slave
+                if self.master != self.worker:
+                    m = direct_connect(master[1])
+                    m.slaves = self.worker
+                
+                db.workers_status()
+                registered = True
+            except Pyro5.errors.PyroError:
+                sleep(self._timeout)
+    
+    def background(self):
+        ...
 
     def get_result(self, id: int):
         if self.results.get(id) is not None:
@@ -189,7 +231,7 @@ class Worker(BaseServer):
             pass
 
     # TODO: disconected nodes
-
+    # FIX
     def replicate(self):
         while True:
             for slave in self.slaves:

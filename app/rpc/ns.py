@@ -158,9 +158,10 @@ class Node(BaseServer):
             pass
     
     # FIX: update ns?
-    def register(self, name: str, f):
-        uri = self.daemon.register(f, force=True)
+    def register(self, name: str, f, id: str=None):
+        uri = self.daemon.register(f, force=True, objectId=id)
         self.ns.register(name, uri)
+        return uri
 
 
 def locate_ns() -> Proxy:

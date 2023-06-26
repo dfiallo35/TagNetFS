@@ -57,6 +57,10 @@ def log(
     logger.addHandler(ch)
     return logger
 
+
+def generate_worker_uri(id: str, ip: str, port: int):
+    return f'PYRO:{id}@{ip}:{port}'
+
 # def get_configs():
 #     with open(CONFIG_PATH, 'r') as file:
 #         config = yaml.load(file, Loader=yaml.FullLoader)

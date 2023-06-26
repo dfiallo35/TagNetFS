@@ -20,6 +20,7 @@ db_log = log('data-base', logging.INFO)
 # TODO: if dont get responce from server, repeat the requets to other server from the same group
 
 
+@Pyro5.api.expose
 class DataBase:
     def __init__(self) -> None:
         self._job_id = 0
@@ -31,24 +32,28 @@ class DataBase:
         # GROUPS
         self._groups_len = 2
         self._timeout_groups = 2
-        self._groups: Dict[int, Dict[str, List|Tuple]] = {}
-        self.groups_thread = Kthread(
-            target=self.assign_groups,
-            daemon=True,
-        )
-        self.groups_thread.start()
+        self._groups: Dict[int, List[Tuple]] = {}
+        self._group_workers = set()
+        # self.groups_thread = Kthread(
+        #     target=self.assign_groups,
+        #     daemon=True,
+        # )
+        # self.groups_thread.start()
 
         # LOCKS
         self.lock_id = Lock()
         self.lock_groups = Lock()
+    
+    def ping(self):
+        return PING
 
     @property
-    def job_id(self):
+    def clock(self):
         with self.lock_id:
             return self._job_id
 
-    @job_id.setter
-    def job_id(self, id: int):
+    @clock.setter
+    def clock(self, id: int):
         with self.lock_id:
             self._job_id = id
 
@@ -56,6 +61,10 @@ class DataBase:
     def timeout(self):
         return self._timeout
 
+    @property
+    def groups_len(self):
+        return self._groups_len
+    
     @property
     def groups(self):
         with self.lock_groups:
@@ -65,11 +74,49 @@ class DataBase:
     def groups(self, groups: Dict):
         with self.lock_groups:
             self._groups = groups
+    
+    @property
+    def workers(self):
+        '''
+        Get the list of all availble workers.
+        '''
+        timeout = self.timeout
+        while True:
+            try:
+                ns = locate_ns()
+                return list(ns.list(prefix=self.worker_prefix).items())
+            except Pyro5.errors.NamingError:
+                sleep(timeout)
+                timeout = increse_timeout(timeout)
+    
+    @property
+    def group_masters(self):
+        '''
+        Get the list of masters.
+        '''
+        return [self.groups[g]['master'] for g in self.groups.keys()]
+    
+
+    def register_worker(self, worker: Tuple):
+        groups = sorted(list(self.groups.keys()))
+        if groups:
+            last_group = groups[-1]
+            if len(self.groups[last_group]['workers']) < self.groups_len:
+                self.groups[last_group]['workers'].append(worker)
+                return last_group, self.groups[last_group]['master']
+            else:
+                new_group = last_group + 1
+                self.groups[new_group] = {'master':worker, 'workers':[worker]}
+                return new_group, worker
+        else:
+            new_group = 1
+            self.groups[new_group] = {'master':worker, 'workers':[worker]}
+            return new_group, worker
 
     # FIX: TRY
     def execute(self, request: Tuple):
-        id = self.job_id + 1
-        self.job_id = id
+        id = self.clock + 1
+        self.clock = id
         timeout = self.timeout
         while True:
             try:
@@ -85,23 +132,11 @@ class DataBase:
 
     # FIX
     def add_request(self, requests: Tuple, id: int):
-        self._requests[id] = requests
+        self._requests[id] = requests    
 
-    def workers(self):
-        '''
-        Get the list of all availble workers.
-        '''
-        timeout = self.timeout
-        while True:
-            try:
-                ns = locate_ns()
-                return list(ns.list(prefix=self.worker_prefix).items())
-            except Pyro5.errors.NamingError:
-                sleep(timeout)
-                timeout = increse_timeout(timeout)
-
+    # FIX
     def workers_status(self):
-        workers = self.workers()
+        workers = self.workers
         print('--------------------------------------------------')
         for worker in workers:
             w = direct_connect(worker[1])
@@ -111,111 +146,6 @@ class DataBase:
                 print(f'  {i}: {status[i]}')
             print()
         print('--------------------------------------------------')
-
-    def assign_groups(self) -> Dict:
-        '''
-        Get a dictionary of group:list[workers].
-        '''
-        timeout = self.timeout
-        while True:
-            try:
-                workers = self.workers()
-                if workers:
-                    # FIX:
-                    groups = {i: {'master': None, 'workers': []} for i in range(
-                        1, divide(len(workers), self._groups_len)+1)}
-
-                    # Find workers without groups
-                    workers_without_group = []
-                    for worker in workers:
-                        w = direct_connect(worker[1])
-                        worker_master = w.master
-                        worker_group = w.group
-                        if not worker_group:
-                            workers_without_group.append(worker)
-                        else:
-                            if not groups.get(worker_group):
-                                workers_without_group.append(worker)
-                            elif worker_master:
-                                groups[worker_group]['master'] = worker
-                                groups[worker_group]['workers'].append(worker)
-                            else:
-                                groups[worker_group]['workers'].append(worker)
-
-                    # Assign group to workers
-                    for worker in workers_without_group:
-                        sorted_groups = sorted(
-                            [(group, len(groups[group]['workers'])) for group in groups], key=lambda x: x[1])
-                        smaller = sorted_groups[0][0]
-                        groups[smaller]['workers'].append(worker)
-
-                    # Move from group
-                    while True:
-                        if len(groups) >= 2:
-                            sorted_groups = sorted(
-                                [(group, len(groups[group]['workers'])) for group in groups], key=lambda x: x[1])
-                            first = sorted_groups[0]
-                            last = sorted_groups[-1]
-                            if first[1] < self._groups_len and last[1] > self._groups_len:
-                                worker = random.choice(
-                                    groups[last[0]]['workers'])
-                                groups[last[0]]['workers'].remove(worker)
-                                groups[first[0]]['workers'].append(worker)
-                            else:
-                                break
-                        else:
-                            break
-
-                    # Assign master to groups
-                    for group in groups:
-                        if not groups[group]['master']:
-                            groups[group]['master'] = random.choice(
-                                [i for i in groups[group]['workers'] if i != groups[group]['master']])
-
-                    # Update nodes
-                    if groups != self.groups:
-                        for group in groups:
-                            w = direct_connect(groups[group]['master'][1])
-                            w_group = w.group
-                            if w_group:
-                                if w_group != group:
-                                    w.group = group
-                                    files = w.export_db(
-                                        len(list(groups.keys())))
-                                    for f, g in zip(files, groups.values()):
-                                        master = direct_connect(g['master'][1])
-                                        master.import_db(f)
-                            else:
-                                w.group = group
-                            w.master = True
-                            w.slaves = [i for i in groups[group]
-                                        ['workers'] if i != groups[group]['master']]
-
-                            for i in groups[group]['workers']:
-                                w = direct_connect(i[1])
-                                if i != groups[group]['master']:
-                                    w.slaves = []
-                                    w.master = False
-                                w_group = w.group
-                                if w_group:
-                                    if w_group != group:
-                                        w.group = group
-                                        w.clear_db()
-                                else:
-                                    w.group = group
-                        self.groups = groups
-                        self.workers_status()
-                sleep(self._timeout_groups)
-
-            except Pyro5.errors.PyroError:
-                sleep(timeout)
-                timeout = increse_timeout(timeout)
-
-    def group_masters(self):
-        '''
-        Get the list of masters.
-        '''
-        return [self.groups[g]['master'] for g in self.groups.keys()]
 
     def locate_file(self, workers: List[Tuple], file_name: str):
         db_log.debug('execute: locate file...')
@@ -233,7 +163,7 @@ class DataBase:
         Select workers that should do the next job.
         '''
         db_log.debug('excecute: assign_workers...')
-        workers = self.group_masters()
+        workers = self.group_masters
         if request[0] == ADD:
             rewrite: Dict[Tuple, List] = {}
             add = []
@@ -321,3 +251,4 @@ class DataBase:
             for i in results:
                 r.update(i)
             return r
+

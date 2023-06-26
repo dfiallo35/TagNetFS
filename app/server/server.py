@@ -48,6 +48,9 @@ class Server():
 
         # LOCKS
         self.lock_elections = Lock()
+    
+    def ping(self):
+        return PING
 
     @property
     def id(self):
@@ -110,14 +113,15 @@ class Server():
         self._root = Dispatcher()
         self._server.register('leader', self)
         self._server.register('request', self._root)
+        self._server.register('db', self._root.db)
         server_log.info('Node: {} become leader'.format(self.node_name))
 
     def become_node(self):
         self.kill()
         self._server = Node(self.host, self.port)
-        self._root = Worker()
-        self._server.register(self.node_name, self)
-        self._server.register(self.worker_name, self._root)
+        self._root = Worker(self.host, self.port, self.id)
+        self._server.register(self.worker_name, self._root, str(self.id))
+        self._root.register_worker()
         server_log.info('Node: {} become worker\n'.format(self.node_name))
 
     ########### ELECTIONS ###########
@@ -208,5 +212,3 @@ class Server():
             self._root = None
         except AttributeError:
             pass    
-    def ping(self):
-        return PING
