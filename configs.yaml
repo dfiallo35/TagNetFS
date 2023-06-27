@@ -1,0 +1,15 @@
+# {
+#     "global_timeout": 0.1,
+#     "groups_len":2,
+#     "elections_timeout":2,
+#     "timeout_groups":2
+    
+# }
+
+global_timeout: 0.1
+
+groups_len:2
+
+elections_timeout:2
+
+timeout_groups:2

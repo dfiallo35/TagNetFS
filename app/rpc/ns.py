@@ -16,6 +16,7 @@ from Pyro5.nameserver import NameServerDaemon, BroadcastServer
 
 from app.utils.thread import Kthread
 from app.utils.constant import *
+from app.server.base_server import  *
 
 class Leader(BaseServer):
     def __init__(self, ip: str, port: str):

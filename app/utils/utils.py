@@ -1,5 +1,5 @@
 import os
-# import yaml
+import yaml
 import logging
 import hashlib
 from time import sleep
@@ -57,14 +57,14 @@ def log(
     logger.addHandler(ch)
     return logger
 
-# def get_configs():
-#     with open(CONFIG_PATH, 'r') as file:
-#         config = yaml.load(file, Loader=yaml.FullLoader)
-#     return config
+def get_configs():
+    with open(CONFIG_PATH, 'r') as file:
+        config = yaml.load(file, Loader=yaml.FullLoader)
+    return config
 
 
-# def set_configs(data: Dict):
-#     with open(CONFIG_PATH, 'w') as file:
-#         yaml.dump(data, file)
+def set_configs(data: Dict):
+    with open(CONFIG_PATH, 'w') as file:
+        yaml.dump(data, file)
 
 

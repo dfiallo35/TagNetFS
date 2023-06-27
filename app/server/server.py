@@ -31,6 +31,7 @@ server_log = log('server', logging.INFO)
 @Pyro5.api.expose
 class Server():
     def __init__(self, nbits: int = 8):
+        
         self._host = socket.gethostbyname(socket.gethostname())
         self._port = 9090
         self._id = hash(nbits, self._host)
