@@ -160,13 +160,12 @@ class DataBase:
                     self.groups[new_group] = {'master':worker, 'workers':[worker]}
                     return new_group, worker, []
             else:
-                print('no group...')
                 new_group = 1
                 self.groups[new_group] = {'master':worker, 'workers':[worker]}
-                print('end no group...')
                 return new_group, worker, []
 
     # FIX: TRY
+    # BUG: what to do with desconected groups
     def execute(self, request: Tuple):
         id = self.clock + 1
         self.clock = id

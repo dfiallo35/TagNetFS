@@ -6,6 +6,7 @@ from typing import Tuple, List, Dict
 
 from app.database.api import *
 from app.database.crud import *
+from app.database.tools import *
 from app.utils.constant import *
 from app.utils.utils import *
 from app.utils.thread import Kthread
@@ -189,8 +190,9 @@ class Worker(BaseServer):
         worker_log.info('export db...\n')
         return divide_db(self.get_db(), n)
 
-    def import_db(self, files):
+    def import_db(self, files, clock: int):
         worker_log.info('import files...\n')
+        self.clock = clock
         save_files(self.get_db(), files)
 
     def clear_db(self):
@@ -245,6 +247,7 @@ class Worker(BaseServer):
             pass
 
     # FIX
+    # BUG: Copy all db
     def replicate(self):
         for slave in self.slaves:
             try:
@@ -276,6 +279,6 @@ class Worker(BaseServer):
                         worker_log.info(
                             f'replicate: Copy all db to {slave[0]}...\n')
                         files = self.export_db(1)[0]
-                        w.import_db(files)
+                        w.import_db(files, self.clock)
             except Pyro5.errors.PyroError:
                 self.regroup()

@@ -1,5 +1,6 @@
 from os import makedirs
 from sqlalchemy.orm import Session
+from os.path import join
 
 from . import models, schemas, tools
 from app.utils.utils import *
@@ -63,11 +64,13 @@ def get_files_by_name(db: Session, file_name: str):
     file = db.query(models.File).filter(models.File.name == file_name).first()
     return file
 
+# CHECK
 def all_files(db: Session):
     '''
     Get all data from db by file and his tags.
     '''
     files = db.query(models.File).all()
+    files = [(file, tools.get_file(join('files', file.name))) for file in files]
     return files
 
 def divide_db(db: Session, pieces: int):
@@ -81,10 +84,16 @@ def save_files(db: Session, files: List[models.File]):
     '''
     Save in the db the file list and his tags.
     '''
-    for file in files:
+    _files = []
+    for file, file_content in files:
+        _files.append((file_content, file.name))
         db.add(file)
         db.commit()
         db.refresh(file)
+    _files = tools.dirs_to_UploadFile(_files)
+    for f in _files:
+        tools.copy_file(f, 'files')
+    
 
 def clear_db(db: Session):
     db.query(models.File).delete()
