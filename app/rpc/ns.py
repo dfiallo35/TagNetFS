@@ -35,7 +35,7 @@ class Leader(BaseServer):
         self.internalUri = self.daemon.uriFor(
             self.daemon.nameserver, nat=False)
 
-        self.bcserver = BroadcastServer(self.nsUri)
+        self.bcserver = BroadcastServer(self.nsUri, '10.0.255.255')
         print("Broadcast server running on {}".format(self.bcserver.locationStr))
         self.bcserver.runInThread()
 
@@ -176,7 +176,7 @@ def locate_ns() -> Proxy:
     ns = []
     for _ in range(3):
         try:
-            for bcaddr in config.BROADCAST_ADDRS:
+            for bcaddr in ['10.0.255.255']:
                 try:
                     sock.sendto(b"GET_NSURI", 0, (bcaddr, port))
                 except socket.error as x:
