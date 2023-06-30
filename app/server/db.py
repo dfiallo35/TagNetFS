@@ -13,8 +13,6 @@ from app.utils.thread import Kthread
 db_log = log('data-base', logging.INFO)
 
 
-# TODO: when copy db also copy files
-# TODO: move db in worker
 
 # FIX: What to do with existent db
 # TODO: if dont get responce from server, repeat the requets to other server from the same group

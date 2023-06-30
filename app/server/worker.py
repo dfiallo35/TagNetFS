@@ -247,7 +247,6 @@ class Worker(BaseServer):
             pass
 
     # FIX
-    # BUG: Copy all db
     def replicate(self):
         for slave in self.slaves:
             try:

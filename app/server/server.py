@@ -23,10 +23,8 @@ server_log = log('server', logging.INFO)
 # TODO: file for configs
 # TODO: change the needed try to repeat the proces n times if exception
 # TODO: save a file with te node state?
-# TODO: Exception when there is no workers
 
 # FIX: kill ktreads
-# FIX: running threads
 
 @Pyro5.api.expose
 class Server():
@@ -127,7 +125,6 @@ class Server():
     ########### ELECTIONS ###########
 
     # TODO: Try if ns if alive, in other case call locate_ns
-
     def run_elections(self):
         '''
         Run the elections loop.
@@ -192,7 +189,6 @@ class Server():
                     server_log.info(
                         "Node {} is the new coordinator\n".format(self.node_name))
             else:
-                # NOTE : if alredy worker? FIXed
                 if not (self._root is Worker):
                     self.become_node()
 
