@@ -64,7 +64,7 @@ def get_files_by_name(db: Session, file_name: str):
     file = db.query(models.File).filter(models.File.name == file_name).first()
     return file
 
-# CHECK
+
 def all_files(db: Session):
     '''
     Get all data from db by file and his tags.

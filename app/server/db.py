@@ -14,7 +14,6 @@ db_log = log('data-base', logging.INFO)
 
 
 
-# FIX: What to do with existent db
 # TODO: if dont get responce from server, repeat the requets to other server from the same group
 # BUG: when you close the last node in one group
 
@@ -106,12 +105,10 @@ class DataBase:
         '''
         return [self.groups[g]['master'] for g in self.groups.keys()]
     
-    # BUG: various groups with one worker
-    # FIX: if loose lowers groups move currents
+    
     def regroup(self, group: int, worker: Tuple):
         # If the worker alredy has a group assigned
         if group:
-            # TODO: move workers from others groups if there is only one in this
             workers_alive = self.groups[group].copy()
             master = workers_alive['master']
             workers = workers_alive['workers'].copy()
@@ -149,8 +146,7 @@ class DataBase:
                 return group, workers_alive['master'], []
         
         # Assign a group to worker
-        # TODO: when add a node and the is a group with len(group) > group_len take both to new group
-        # TODO: when and a node and it will be alone in a group... 
+        # TODO: when add a node and it will be alone in a group... 
         else:
             groups = self.groups
             if groups:
@@ -201,7 +197,6 @@ class DataBase:
                 return new_group, worker, []
 
     # FIX: TRY
-    # BUG: what to do with desconected groups
     def execute(self, request: Tuple):
         id = self.clock + 1
         self.clock = id
@@ -238,7 +233,6 @@ class DataBase:
         db_log.debug('execute: locate file...')
         for worker in workers:
             w = direct_connect(worker[1])
-            # CHECK:
             located_file = w.locate_file(file_name)
 
             if located_file:

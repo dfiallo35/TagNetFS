@@ -87,7 +87,6 @@ class Worker(BaseServer):
         with self.lock_master:
             return self._master
 
-    # FIX
     @master.setter
     def master(self, master: Tuple):
         with self.lock_master:
@@ -146,7 +145,6 @@ class Worker(BaseServer):
             id, request = id_request
             self._requests[id] = request
     
-    # FIX: kill thread for leader
     def register_worker(self):
         while not self.group:
             try:
@@ -160,7 +158,6 @@ class Worker(BaseServer):
                 sleep(self._timeout)
     
 
-    # FIX: call master to register slave from here
     def regroup(self):
         ns = locate_ns()
         db = connect(ns, 'db')
@@ -206,7 +203,6 @@ class Worker(BaseServer):
         self.slaves = slaves
         db.workers_status()
 
-    # BUG: circular reference when eliminate an slave with data
     def background(self):
         while True:
             if self.master != self.worker:
@@ -244,7 +240,6 @@ class Worker(BaseServer):
         self.clock = clock
         save_files(self.get_db(), files)
 
-    # FIX: delete files
     def clear_db(self):
         clear_db(self.get_db())
 
