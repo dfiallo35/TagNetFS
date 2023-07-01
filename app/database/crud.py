@@ -1,4 +1,5 @@
 from os import makedirs
+import shutil
 from sqlalchemy.orm import Session
 from os.path import join
 
@@ -97,5 +98,5 @@ def save_files(db: Session, files: List[models.File]):
 
 def clear_db(db: Session):
     if os.path.exists('files'):
-        os.remove('files')
+        shutil.rmtree('files')
     db.query(models.File).delete()

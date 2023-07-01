@@ -15,7 +15,7 @@ from app.rpc.ns import *
 from app.server.base_server import BaseServer
 
 
-worker_log = log('worker', logging.DEBUG)
+worker_log = log('worker', logging.INFO)
 
 
 # FIX: different id than db class
@@ -23,27 +23,28 @@ worker_log = log('worker', logging.DEBUG)
 @Pyro5.api.expose
 class Worker(BaseServer):
     def __init__(self, host: str, port: int, id: int):
+        # worker info
         self.host = host
         self.port = port
         self.id = id
-
         self._worker_uri = generate_worker_uri(self.id, self.host, self.port)
         self.worker_name = f'worker-{id}'
 
+        # database
         self.database = DatabaseSession()
         self._requests = {}
         self.results: Dict[int, dict] = {}
         self._timeout = 0.1
+        self._job_id = 0
+        self._busy = False
 
+        # master-slave data
         self._group = None
         self._master = None
         self._slaves = []
         self._background_thread: Kthread = None
-        
-        self._job_id = 0
-        self._busy = False
 
-        # LOCKS
+        # locks
         self.lock_clock = Lock()
         self.lock_busy = Lock()
         self.lock_master = Lock()
@@ -55,6 +56,9 @@ class Worker(BaseServer):
 
     @property
     def status(self):
+        '''
+        Return the status of the worker.
+        '''
         status = {
             'clock': self.clock,
             'group': self.group,
@@ -65,40 +69,66 @@ class Worker(BaseServer):
     
     @property
     def worker(self):
+        '''
+        Return the worker info.
+        '''
         return (self.worker_name, self.worker_uri)
 
     @property
     def worker_uri(self):
+        '''
+        Return the worker uri.
+        '''
         return self._worker_uri
     
 
     @property
     def clock(self):
+        '''
+        Return the clock of the worker.
+        '''
         with self.lock_clock:
             return self._job_id
 
     @clock.setter
     def clock(self, clock: int):
+        '''
+        Set the clock of the worker.
+        '''
         with self.lock_clock:
             self._job_id = clock
 
     @property
     def master(self):
+        '''
+        Return the master.
+        '''
         with self.lock_master:
             return self._master
 
     @master.setter
     def master(self, master: Tuple):
+        '''
+        Set the master.
+        '''
         with self.lock_master:
             self._master = master
 
     @property
     def slaves(self):
+        '''
+        Return the slaves.
+        '''
         with self.lock_slaves:
             return self._slaves
 
     @slaves.setter
     def slaves(self, slaves: Tuple|List[Tuple]):
+        '''
+        Set the slaves.
+        If slaves is a tuple, append it to the list of slaves.
+        If slaves is a list, set it as the list of slaves.
+        '''
         with self.lock_slaves:
             if isinstance(slaves, Tuple):
                 self._slaves.append(slaves)
@@ -107,6 +137,9 @@ class Worker(BaseServer):
                 self._slaves = slaves
     
     def own_slave(self, slave: Tuple):
+        '''
+        Return True if the slave is owned by the worker.
+        '''
         try:
             s = direct_connect(slave[1])
             if s.group == self.group:
@@ -118,62 +151,94 @@ class Worker(BaseServer):
 
     @property
     def group(self):
+        '''
+        Return the group.
+        '''
         return self._group
 
     @group.setter
     def group(self, group: int):
+        '''
+        Set the group.
+        '''
         self._group = group
 
     @property
     def busy(self):
+        '''
+        Return True if the worker is busy.
+        '''
         with self.lock_busy:
             return self._busy
 
     @busy.setter
     def busy(self, busy: bool):
+        '''
+        Set the busy status of the worker.
+        '''
         with self.lock_busy:
             self._busy = busy
 
     @property
     def requests(self):
+        '''
+        Return the requests.
+        '''
         with self.lock_requests:
             return self._requests
 
     @requests.setter
     def requests(self, id_request: Tuple):
+        '''
+        Set the requests.
+        '''
         with self.lock_requests:
             id, request = id_request
             self._requests[id] = request
     
     def register_worker(self):
+        '''
+        Register the worker to the name server and the database.
+        '''
         while not self.group:
             try:
                 self.regroup()
-                self._background_thread = Kthread(
-                    target=self.background,
-                    daemon=True
-                )
-                self._background_thread.start()
+                self.run_threads()
             except Pyro5.errors.PyroError:
                 sleep(self._timeout)
     
+    def run_threads(self):
+        '''
+        Run the background thread.
+        '''
+        self._background_thread = Kthread(
+            target=self.background,
+            daemon=True
+        )
+        self._background_thread.start()
 
     def regroup(self):
+        '''
+        Regroup the worker to a group.
+        '''
+        worker_log.info('regroup...')
         ns = locate_ns()
         db = connect(ns, 'db')
         group, master, slaves = db.regroup(self.group, self.worker)
         
-        # FIX: 
-        # to export database when this node is sent to another group
+        # If worker is being moved to a new group, export his db and clear it
         if self.group and self.master == self.worker and self.group != group:
-            worker_log.debug('changing group\n')
+            worker_log.info('changing group...\n')
             completed = False
             while not completed:
                 try:
-                    masters = db.masters
+                    masters = [_m for _m in db.masters if _m != self.worker]
                     files = self.export_db(len(masters))
+                    # BUG: circular reference
                     for master, f in zip(masters, files):
+                        print('master:', master)
                         m = direct_connect(master[1])
+                        print('import...')
                         m.import_db(f, self.clock)
                     self.clear_db()
                     completed = True
@@ -188,6 +253,7 @@ class Worker(BaseServer):
                     s.master = master
                 except Pyro5.errors.PyroError:
                     pass
+        # tell the master that this is a new slave
         else:
             completed = False
             while not completed:
@@ -198,13 +264,18 @@ class Worker(BaseServer):
                 except Pyro5.errors.PyroError:
                     sleep(self._timeout)
         
+        # update the worker
         self.group = group
         self.master = master
         self.slaves = slaves
         db.workers_status()
 
     def background(self):
+        '''
+        Background thread.
+        '''
         while True:
+            # if the worker is not the master, ping the master
             if self.master != self.worker:
                 try:
                     worker_log.debug('ping master...\n')
@@ -213,44 +284,63 @@ class Worker(BaseServer):
                 except Pyro5.errors.PyroError:
                     worker_log.debug('no master, regroup\n')
                     self.regroup()
+            # if the worker is the master, try replicating
             else:
                 worker_log.debug('replicate...\n')
                 self.replicate()
             sleep(1)
 
-    def pop_slave(self, slave: int):
-        with self.lock_slaves:
-            if slave in self._slaves:
-                self._slaves.remove(slave)
 
     def get_result(self, id: int):
+        '''
+        Return the result of the request.
+        '''
         if self.results.get(id) is not None:
             return self.results.pop(id)
         return None
 
     def get_db(self):
+        '''
+        Return the database.
+        '''
         return self.database.get_db()
 
     def export_db(self, n: int):
+        '''
+        Export the database dividing it in n parts.
+        '''
         worker_log.info('export db...\n')
         return divide_db(self.get_db(), n)
 
     def import_db(self, files, clock: int):
+        '''
+        Import the database and set the clock.
+        '''
         worker_log.info('import files...\n')
         self.clock = clock
         save_files(self.get_db(), files)
 
     def clear_db(self):
+        '''
+        Clear the database.
+        '''
+        worker_log.info('clear db...\n')
         clear_db(self.get_db())
 
     def locate_file(self, file_name: str):
-        print('locate...')
+        '''
+        Return True if the file is in the database.
+        '''
+        print('locate...\n')
         file = get_files_by_name(self.get_db(), file_name)
         if file:
             return True
         return False
 
     def run(self, request: Tuple, id: int):
+        '''
+        Run the request.
+        '''
         self.clock = self.clock + 1
         self.requests = (self.clock, request)
         t = Kthread(
@@ -261,6 +351,9 @@ class Worker(BaseServer):
         t.start()
 
     def execute(self, request: Tuple, id: int):
+        '''
+        Execute the request.
+        '''
         self.busy = True
         match request[0]:
             case 'add':
@@ -286,24 +379,39 @@ class Worker(BaseServer):
         self.busy = False
     
     def kill_threads(self):
+        '''
+        Kill the background thread.
+        '''
         try:
             self._background_thread.kill()
+            self._background_thread = None
         except:
-            pass
+            self._background_thread = None
 
-    # FIX
+
     def replicate(self):
+        '''
+        Replicate the database to the slaves.
+        '''
         for slave in self.slaves:
+            # if this master is not the master of the slave go regroup
             if not self.own_slave(slave):
                 self.regroup()
                 break
             try:
+                # try to connect to the slave
                 w = direct_connect(slave[1])
                 w_clock = w.clock
                 next_clock = w_clock+1
+
+                # if the slave's clock is behind the master's clock
                 if w_clock < self.clock:
+                    # if next request to slave is in requests
                     if next_clock in self.requests:
+                        # if slave is not busy
                         if not w.busy:
+                            # FIX: run also delete requests, because modify rhe db
+                            # for add request
                             if self.requests[next_clock][0] == ADD:
                                 worker_log.debug(f'replicate: run add\n')
                                 w.run(
@@ -319,13 +427,19 @@ class Worker(BaseServer):
                                     else:
                                         sleep(self._timeout)
                                         timeout = increse_timeout(timeout)
+                            
+                            # just update for requests that don't modify the db
                             else:
                                 worker_log.debug(f'replicate: set clock\n')
                                 w.clock = next_clock
                     else:
+                        # copy all the db to the slave
+                        # FIX: delete the database of the slave before export
                         worker_log.info(
                             f'replicate: Copy all db to {slave[0]}...\n')
                         files = self.export_db(1)[0]
                         w.import_db(files, self.clock)
+            
             except Pyro5.errors.PyroError:
+                # if the slave is not reachable, regroup
                 self.regroup()

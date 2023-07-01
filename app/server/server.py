@@ -24,27 +24,30 @@ server_log = log('server', logging.INFO)
 # TODO: change the needed try to repeat the proces n times if exception
 # TODO: save a file with te node state?
 
-# FIX: kill ktreads
+# FIX: new coordinator and functions
 
 @Pyro5.api.expose
 class Server():
     def __init__(self, nbits: int = 8):
+        # node info
         self._host = socket.gethostbyname(socket.gethostname())
         self._port = 9090
         self._id = hash(nbits, self._host)
         self._nbits = nbits
         server_log.info('Node name: {}'.format(self.node_name))
 
+        # node state
         self._alive = True
         self._timeout: int = 2
         self._in_elections = False
         self.elections_thread: Kthread = None
         self._coordinator: Server = None
 
+        # node functions
         self._server = None
         self._root = None
 
-        # LOCKS
+        # locks
         self.lock_elections = Lock()
     
     def ping(self):
@@ -52,43 +55,73 @@ class Server():
 
     @property
     def id(self):
+        '''
+        Return the node id.
+        '''
         return self._id
 
     @property
     def host(self):
+        '''
+        Return the node host.
+        '''
         return self._host
 
     @property
     def port(self):
+        '''
+        Return the node port.
+        '''
         return self._port
 
     @property
     def coordinator(self):
+        '''
+        Return the node coordinator.
+        '''
         return self._coordinator
 
     @property
     def timeout(self):
+        '''
+        Return the node timeout.
+        '''
         return self._timeout
 
     @property
     def node_name(self):
+        '''
+        Return the node name.
+        '''
         return 'node-{}'.format(str(self.id))
 
     @property
     def worker_name(self):
+        '''
+        Return the worker name.
+        '''
         return 'worker-{}'.format(str(self.id))
 
     @property
     def is_alive(self):
+        '''
+        Return if the node is alive.
+        '''
         return self._alive
 
     @property
     def in_elections(self):
+        '''
+        Return if the node is in elections.
+        '''
         with self.lock_elections:
             return self._in_elections
 
     @in_elections.setter
     def in_elections(self, elections: bool):
+        '''
+        Set if the node is in elections.
+        '''
         with self.lock_elections:
             self._in_elections = elections
 
@@ -106,6 +139,9 @@ class Server():
             ...
 
     def become_leader(self):
+        '''
+        Become the leader.
+        '''
         self.kill()
         self._server = Leader(self.host, self.port)
         self._root = Dispatcher()
@@ -115,6 +151,9 @@ class Server():
         server_log.info('Node: {} become leader'.format(self.node_name))
 
     def become_node(self):
+        '''
+        Become a node.
+        '''
         self.kill()
         self._server = Node(self.host, self.port)
         self._root = Worker(self.host, self.port, self.id)
@@ -130,19 +169,22 @@ class Server():
         Run the elections loop.
         '''
         while True:
-            # logging.info('Running election...\n')
-
             try:
+                # if there is no coordinator or the coordinator is dead
                 if not self.coordinator or not self.coordinator.is_alive:
                     self.election()
+                
+                # if the coordinator is alive
                 else:
+                    # compare the node coordinator with the real coordinator
                     ns = locate_ns()
-                    if ns and ns._pyroUri.host != self.coordinator.host:
+                    if ns._pyroUri.host != self.coordinator.host:
                         self.election()
+            
             except Pyro5.errors.PyroError:
+                # coordinator is dead
                 self.election()
 
-            # logging.info('Election end\n')
             sleep(self.timeout)
 
     def find_coordinator(self):
@@ -150,6 +192,7 @@ class Server():
         Find the coordinator.
         '''
         try:
+            # if there is no coordinator or the coordinator is dead
             if not self.coordinator or not self.coordinator.is_alive:
                 try:
                     ns = locate_ns()
@@ -157,8 +200,11 @@ class Server():
                     return coordinator
                 except Pyro5.errors.NamingError:
                     return self
+            
+            # if the coordinator is alive
             else:
                 try:
+                    # compare the node coordinator with the real coordinator
                     ns = locate_ns()
                     if ns and ns._pyroUri.host != self.coordinator.host:
                         coordinator = connect(ns, 'leader')
@@ -167,27 +213,31 @@ class Server():
                     return self._coordinator
 
         except Pyro5.errors.PyroError:
+            # coordinator is dead
             try:
                 ns = locate_ns()
                 coordinator = connect(ns, 'leader')
                 return coordinator
+            
             except Pyro5.errors.NamingError:
+                # there is no coordinator
                 return self
 
     def election(self):
         '''
         Go elections.
         '''
+        
+        # find the coordinator
         self.in_elections = True
         coordinator = self.find_coordinator()
         self._coordinator = coordinator
 
+        # assign the functions
         try:
             if self._coordinator.id == self.id:
                 if not (self._root is Leader):
                     self.become_leader()
-                    server_log.info(
-                        "Node {} is the new coordinator\n".format(self.node_name))
             else:
                 if not (self._root is Worker):
                     self.become_node()

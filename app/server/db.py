@@ -15,24 +15,25 @@ db_log = log('data-base', logging.INFO)
 
 
 # TODO: if dont get responce from server, repeat the requets to other server from the same group
-# BUG: when you close the last node in one group
+# BUG: loose data when eliminate a group
 
 @Pyro5.api.expose
 class DataBase:
     def __init__(self) -> None:
+        # db state
         self._job_id = 0
         self.worker_prefix = 'worker-'
         self._timeout = 0.1
         self._requests: Dict[int, Tuple] = {}
         self.results: Dict[int, List[dict]] = {}
 
-        # GROUPS
+        # groups info
         self._groups_len = 2
         self._timeout_groups = 2
         self._groups: Dict[int, Dict[str, Tuple|List[Tuple]]] = {}
         self._group_workers = set()
 
-        # LOCKS
+        # locks
         self.lock_id = Lock()
         self.lock_groups = Lock()
     
@@ -59,7 +60,11 @@ class DataBase:
     
     @property
     def groups(self):
+        '''
+        Get groups.
+        '''
         with self.lock_groups:
+            # In case that this node is new coordinator. Get infro from workers
             if not self._groups:
                 workers = self.workers
                 groups = {}
@@ -77,10 +82,14 @@ class DataBase:
                     except Pyro5.errors.PyroError:
                         pass
                 self._groups = groups
+            
             return self._groups
 
     @groups.setter
     def groups(self, groups: Dict):
+        '''
+        Set groups.
+        '''
         with self.lock_groups:
             self._groups = groups
     
@@ -109,10 +118,12 @@ class DataBase:
     def regroup(self, group: int, worker: Tuple):
         # If the worker alredy has a group assigned
         if group:
+            # get workers from group
             workers_alive = self.groups[group].copy()
             master = workers_alive['master']
             workers = workers_alive['workers'].copy()
 
+            # check workers alive from group
             for check_worker in workers:
                 if check_worker != worker:
                     try:
@@ -120,13 +131,20 @@ class DataBase:
                         w.ping()
                     except Pyro5.errors.PyroError:
                         workers_alive['workers'].remove(check_worker)
+            
+            # check master alive
             if worker != master:
                 try:
                     m = direct_connect(master[1])
                     m.ping()
                 except Pyro5.errors.PyroError:
                     workers_alive['master'] = worker
-            
+                    try:
+                        w = direct_connect(worker[1])
+                        w.master = worker
+                    except Pyro5.errors.PyroError:
+                        pass
+
             # TODO: if len(group) > group_len
             # Move the worker in a group of only one to other group
             if len(workers_alive['workers'])  == 1:
@@ -139,23 +157,26 @@ class DataBase:
                     workers_alive = self.groups[group].copy()
                     workers_alive['workers'].append(worker)
             
+            # update groups
             self.groups[group] = workers_alive
+
+            # return group, master, slaves to current worker
             if worker == workers_alive['master']:
                 return group, workers_alive['master'], [x for x in workers_alive['workers'] if x != worker]
             else:
                 return group, workers_alive['master'], []
         
-        # Assign a group to worker
         # TODO: when add a node and it will be alone in a group... 
+        # Assign a group to worker
         else:
             groups = self.groups
             if groups:
-                
-                # Groups sorted by number of workers
+                # groups sorted by number of workers
                 sorted_groups = sorted([(g, len(groups[g]['workers'])) for g in groups.keys()], key=lambda x: x[1])
                 first_group = sorted_groups[0][0]
                 last_group = sorted_groups[-1][0]
                 
+                # get new group number
                 new_group = 1
                 for i, g in enumerate(sorted(list(groups.keys()))):
                     i+=1
@@ -170,10 +191,12 @@ class DataBase:
                     groups[first_group]['workers'].append(worker)
                     return first_group, groups[first_group]['master'], []
                 
-                # if there is a group with more workers than groups_len
+                # if there is a group with more workers than groups_len. Get one fron that group and send it to the new group
                 elif len(groups[last_group]['workers']) > self.groups_len:
+                    # get random worker from the group with more workers than groups_len
                     take_worker = random.choice([_w for _w in groups[last_group]['workers'] if _w != groups[last_group]['master']])
-                    # update the take_worker and his master
+                    
+                    # update the take_worker
                     added = False
                     while not added:
                         try:
@@ -190,6 +213,7 @@ class DataBase:
                 else:
                     groups[new_group] = {'master':worker, 'workers':[worker]}
                     return new_group, worker, []
+            
             # if not exist groups
             else:
                 new_group = 1
