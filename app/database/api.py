@@ -70,7 +70,6 @@ def delete(
     return {"message": "success"}
 
 
-# FIX: IF not exist tag return {} 
 @app.get('/list/', response_model=List[schemas.File], summary='List the name and the tags of every file that match the tag query')
 def qlist(
         tag_query: Annotated[List[str], Query()],

@@ -96,4 +96,6 @@ def save_files(db: Session, files: List[models.File]):
     
 
 def clear_db(db: Session):
+    if os.path.exists('files'):
+        os.remove('files')
     db.query(models.File).delete()

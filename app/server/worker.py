@@ -15,7 +15,7 @@ from app.rpc.ns import *
 from app.server.base_server import BaseServer
 
 
-worker_log = log('worker', logging.INFO)
+worker_log = log('worker', logging.DEBUG)
 
 
 # FIX: different id than db class
@@ -89,7 +89,7 @@ class Worker(BaseServer):
 
     # FIX
     @master.setter
-    def master(self, master: bool):
+    def master(self, master: Tuple):
         with self.lock_master:
             self._master = master
 
@@ -106,6 +106,16 @@ class Worker(BaseServer):
                 self._slaves = list(set(self._slaves))
             else:
                 self._slaves = slaves
+    
+    def own_slave(self, slave: Tuple):
+        try:
+            s = direct_connect(slave[1])
+            if s.group == self.group:
+                return True
+            else:
+                return False
+        except Pyro5.errors.PyroError:
+            return False
 
     @property
     def group(self):
@@ -149,11 +159,31 @@ class Worker(BaseServer):
             except Pyro5.errors.PyroError:
                 sleep(self._timeout)
     
+
+    # FIX: call master to register slave from here
     def regroup(self):
         ns = locate_ns()
         db = connect(ns, 'db')
         group, master, slaves = db.regroup(self.group, self.worker)
-        self.group = group
+        
+        # FIX: 
+        # to export database when this node is sent to another group
+        if self.group and self.master == self.worker and self.group != group:
+            worker_log.debug('changing group\n')
+            completed = False
+            while not completed:
+                try:
+                    masters = db.masters
+                    files = self.export_db(len(masters))
+                    for master, f in zip(masters, files):
+                        m = direct_connect(master[1])
+                        m.import_db(f, self.clock)
+                    self.clear_db()
+                    completed = True
+                except Pyro5.errors.PyroError:
+                    pass
+        
+        # tell the slaves that this is the new master
         if master == self.worker:
             for slave in slaves:
                 try:
@@ -161,22 +191,41 @@ class Worker(BaseServer):
                     s.master = master
                 except Pyro5.errors.PyroError:
                     pass
+        else:
+            completed = False
+            while not completed:
+                try:
+                    m = direct_connect(master[1])
+                    m.slaves = self.worker
+                    completed = True
+                except Pyro5.errors.PyroError:
+                    sleep(self._timeout)
+        
+        self.group = group
         self.master = master
         self.slaves = slaves
         db.workers_status()
 
+    # BUG: circular reference when eliminate an slave with data
     def background(self):
         while True:
             if self.master != self.worker:
                 try:
+                    worker_log.debug('ping master...\n')
                     m = direct_connect(self.master[1])
                     m.ping()
                 except Pyro5.errors.PyroError:
+                    worker_log.debug('no master, regroup\n')
                     self.regroup()
             else:
+                worker_log.debug('replicate...\n')
                 self.replicate()
             sleep(1)
 
+    def pop_slave(self, slave: int):
+        with self.lock_slaves:
+            if slave in self._slaves:
+                self._slaves.remove(slave)
 
     def get_result(self, id: int):
         if self.results.get(id) is not None:
@@ -195,6 +244,7 @@ class Worker(BaseServer):
         self.clock = clock
         save_files(self.get_db(), files)
 
+    # FIX: delete files
     def clear_db(self):
         clear_db(self.get_db())
 
@@ -249,6 +299,9 @@ class Worker(BaseServer):
     # FIX
     def replicate(self):
         for slave in self.slaves:
+            if not self.own_slave(slave):
+                self.regroup()
+                break
             try:
                 w = direct_connect(slave[1])
                 w_clock = w.clock
@@ -257,7 +310,7 @@ class Worker(BaseServer):
                     if next_clock in self.requests:
                         if not w.busy:
                             if self.requests[next_clock][0] == ADD:
-                                print(f'replicate: run add\n')
+                                worker_log.debug(f'replicate: run add\n')
                                 w.run(
                                     self.requests[next_clock], next_clock)
 
@@ -272,7 +325,7 @@ class Worker(BaseServer):
                                         sleep(self._timeout)
                                         timeout = increse_timeout(timeout)
                             else:
-                                print(f'replicate: set clock\n')
+                                worker_log.debug(f'replicate: set clock\n')
                                 w.clock = next_clock
                     else:
                         worker_log.info(

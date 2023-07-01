@@ -16,7 +16,7 @@ db_log = log('data-base', logging.INFO)
 
 # FIX: What to do with existent db
 # TODO: if dont get responce from server, repeat the requets to other server from the same group
-
+# BUG: when you close the last node in one group
 
 @Pyro5.api.expose
 class DataBase:
@@ -100,13 +100,14 @@ class DataBase:
                 timeout = increse_timeout(timeout)
     
     @property
-    def group_masters(self):
+    def masters(self):
         '''
         Get the list of masters.
         '''
         return [self.groups[g]['master'] for g in self.groups.keys()]
     
-    
+    # BUG: various groups with one worker
+    # FIX: if loose lowers groups move currents
     def regroup(self, group: int, worker: Tuple):
         # If the worker alredy has a group assigned
         if group:
@@ -129,6 +130,18 @@ class DataBase:
                 except Pyro5.errors.PyroError:
                     workers_alive['master'] = worker
             
+            # TODO: if len(group) > group_len
+            # Move the worker in a group of only one to other group
+            if len(workers_alive['workers'])  == 1:
+                print('changing group\n')
+                # sort by number of workers
+                sorted_groups = sorted([(g, len(self.groups[g]['workers'])) for g in self.groups.keys() if group != g], key=lambda x: x[1])
+                if len(sorted_groups):
+                    self.groups.pop(group)
+                    group = sorted_groups[0][0]
+                    workers_alive = self.groups[group].copy()
+                    workers_alive['workers'].append(worker)
+            
             self.groups[group] = workers_alive
             if worker == workers_alive['master']:
                 return group, workers_alive['master'], [x for x in workers_alive['workers'] if x != worker]
@@ -136,30 +149,55 @@ class DataBase:
                 return group, workers_alive['master'], []
         
         # Assign a group to worker
+        # TODO: when add a node and the is a group with len(group) > group_len take both to new group
+        # TODO: when and a node and it will be alone in a group... 
         else:
-            groups = self.groups.copy()    
+            groups = self.groups
             if groups:
-                sorted_groups = sorted([(group, len(self.groups[group]['workers'])) for group in groups.keys()], key=lambda x: x[1])
-                current_group = sorted_groups[0][0]
-                if len(self.groups[current_group]['workers']) < self.groups_len:
-                    self.groups[current_group]['workers'].append(worker)
-                    # Add worker as slave to group master
+                
+                # Groups sorted by number of workers
+                sorted_groups = sorted([(g, len(groups[g]['workers'])) for g in groups.keys()], key=lambda x: x[1])
+                first_group = sorted_groups[0][0]
+                last_group = sorted_groups[-1][0]
+                
+                new_group = 1
+                for i, g in enumerate(sorted(list(groups.keys()))):
+                    i+=1
+                    if i != g:
+                        new_group = i
+                        break
+                    else:
+                        new_group = i+1
+
+                # if there is a group with less workers than groups_len
+                if len(groups[first_group]['workers']) < self.groups_len:
+                    groups[first_group]['workers'].append(worker)
+                    return first_group, groups[first_group]['master'], []
+                
+                # if there is a group with more workers than groups_len
+                elif len(groups[last_group]['workers']) > self.groups_len:
+                    take_worker = random.choice([_w for _w in groups[last_group]['workers'] if _w != groups[last_group]['master']])
+                    # update the take_worker and his master
                     added = False
                     while not added:
                         try:
-                            m = direct_connect(self.groups[current_group]['master'][1])
-                            m.slaves = worker
+                            w = direct_connect(take_worker[1])
+                            w.master = worker
+                            w.slaves = []
+                            w.group = new_group
                             added = True
                         except Pyro5.errors.PyroError:
                             sleep(self.timeout)
-                    return current_group, self.groups[current_group]['master'], []
+                    groups[new_group] = {'master':worker, 'workers':[worker, take_worker]}
+                    return new_group, worker, [take_worker]
+                
                 else:
-                    new_group = current_group + 1
-                    self.groups[new_group] = {'master':worker, 'workers':[worker]}
+                    groups[new_group] = {'master':worker, 'workers':[worker]}
                     return new_group, worker, []
+            # if not exist groups
             else:
                 new_group = 1
-                self.groups[new_group] = {'master':worker, 'workers':[worker]}
+                groups[new_group] = {'master':worker, 'workers':[worker]}
                 return new_group, worker, []
 
     # FIX: TRY
@@ -212,7 +250,7 @@ class DataBase:
         Select workers that should do the next job.
         '''
         db_log.debug('excecute: assign_workers...')
-        workers = self.group_masters
+        workers = self.masters
         if request[0] == ADD:
             rewrite: Dict[Tuple, List] = {}
             add = []
