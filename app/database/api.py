@@ -17,8 +17,6 @@ app = FastAPI()
 
 
 # TODO: Caching with Redis
-# TODO: Save files
-# TODO: Distributed direction of the files in db 
 
 '''
 POST: to create data.
@@ -38,7 +36,6 @@ def get_db(seccion):
 
 
 
-# TODO: files names uniques?
 @app.post('/add', summary='Copy the files to the system and assign them the tags')
 def add(
         file_list: Annotated[List[UploadFile], File(...)],
@@ -73,7 +70,6 @@ def delete(
     return {"message": "success"}
 
 
-# FIX: IF not exist tag return {} 
 @app.get('/list/', response_model=List[schemas.File], summary='List the name and the tags of every file that match the tag query')
 def qlist(
         tag_query: Annotated[List[str], Query()],

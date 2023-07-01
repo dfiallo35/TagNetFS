@@ -35,7 +35,7 @@ class Leader(BaseServer):
         self.internalUri = self.daemon.uriFor(
             self.daemon.nameserver, nat=False)
 
-        self.bcserver = BroadcastServer(self.nsUri)
+        self.bcserver = BroadcastServer(self.nsUri, '10.0.255.255')
         print("Broadcast server running on {}".format(self.bcserver.locationStr))
         self.bcserver.runInThread()
 
@@ -103,7 +103,7 @@ class Leader(BaseServer):
                     try:
                         p = direct_connect(uri)
                         p.ping()
-                    except Pyro5.errors.CommunicationError:
+                    except Pyro5.errors.PyroError:
                         print(f"Object {name} is not alive, unregistering...")
                         ns.remove(name)
                 sleep(self._timeout)
@@ -158,9 +158,10 @@ class Node(BaseServer):
             pass
     
     # FIX: update ns?
-    def register(self, name: str, f):
-        uri = self.daemon.register(f, force=True)
+    def register(self, name: str, f, id: str=None):
+        uri = self.daemon.register(f, force=True, objectId=id)
         self.ns.register(name, uri)
+        return uri
 
 
 def locate_ns() -> Proxy:
@@ -175,7 +176,7 @@ def locate_ns() -> Proxy:
     ns = []
     for _ in range(3):
         try:
-            for bcaddr in config.BROADCAST_ADDRS:
+            for bcaddr in ['10.0.255.255']:
                 try:
                     sock.sendto(b"GET_NSURI", 0, (bcaddr, port))
                 except socket.error as x:

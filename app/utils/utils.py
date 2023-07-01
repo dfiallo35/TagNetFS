@@ -1,4 +1,5 @@
 import os
+import base64
 # import yaml
 import logging
 import hashlib
@@ -10,18 +11,17 @@ from fastapi import UploadFile
 
 CONFIG_PATH = 'config.yml'
 
+def encode(data: bytes):
+    return base64.b64encode(data)
+
+def decode(data: bytes):
+    return base64.b64decode(data)
 
 def hash(bits: int, host: str):
     return int(hashlib.sha256(host.encode('utf-8', 'ignore')).hexdigest(), 16) % (2 ** bits)
 
-
-def dirs_to_UploadFile(file_list: str):
-    return [UploadFile(file=f, filename=n) for f, n in file_list]
-
-
 def increse_timeout(timeout: float):
     return timeout * 2
-
 
 def split(l: list, n: int):
     x = [[] for _ in range(n)]
@@ -56,6 +56,10 @@ def log(
     ch.setFormatter(formatter)
     logger.addHandler(ch)
     return logger
+
+
+def generate_worker_uri(id: str, ip: str, port: int):
+    return f'PYRO:{id}@{ip}:{port}'
 
 # def get_configs():
 #     with open(CONFIG_PATH, 'r') as file:

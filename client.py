@@ -21,7 +21,7 @@ def add(
     for i in file_list:
         if not os.path.isfile(i):
             raise FileNotFoundError(i)
-        with open(i, 'r') as f:
+        with open(i, 'rb') as f:
             files.append((f.read(), os.path.basename(i)))
     
     Client.run((ADD, files, tag_list))
