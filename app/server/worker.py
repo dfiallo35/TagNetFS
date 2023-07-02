@@ -217,11 +217,12 @@ class Worker(BaseServer):
         )
         self._background_thread.start()
 
+    # FIX: when new node entrer the group
     def regroup(self):
         '''
         Regroup the worker to a group.
         '''
-        worker_log.info('regroup...')
+        worker_log.info('regroup...\n')
         ns = locate_ns()
         db = connect(ns, 'db')
         group, master, slaves = db.regroup(self.group, self.worker)
@@ -234,12 +235,9 @@ class Worker(BaseServer):
                 try:
                     masters = [_m for _m in db.masters if _m != self.worker]
                     files = self.export_db(len(masters))
-                    # BUG: circular reference
                     for master, f in zip(masters, files):
-                        print('master:', master)
                         m = direct_connect(master[1])
-                        print('import...')
-                        m.import_db(f, self.clock)
+                        m.import_db(f)
                     self.clear_db()
                     completed = True
                 except Pyro5.errors.PyroError:
@@ -295,9 +293,10 @@ class Worker(BaseServer):
         '''
         Return the result of the request.
         '''
-        if self.results.get(id) is not None:
-            return self.results.pop(id)
-        return None
+        with self.lock_busy:
+            if self.results.get(id) is not None:
+                return self.results.pop(id)
+            return None
 
     def get_db(self):
         '''
@@ -309,33 +308,43 @@ class Worker(BaseServer):
         '''
         Export the database dividing it in n parts.
         '''
-        worker_log.info('export db...\n')
-        return divide_db(self.get_db(), n)
+        with self.lock_busy:
+            worker_log.info('export db...\n')
+            return divide_db(self.get_db(), n)
 
-    def import_db(self, files, clock: int):
+    def import_db(self, files, clock: int=None):
         '''
         Import the database and set the clock.
         '''
         worker_log.info('import files...\n')
-        self.clock = clock
-        save_files(self.get_db(), files)
+        with self.lock_busy:
+            save_files(self.get_db(), files)
+            with self.lock_requests:
+                self._requests = {}
+            if not clock:
+                self.clock += 1
+            else:
+                self.clock = clock
 
     def clear_db(self):
         '''
         Clear the database.
         '''
         worker_log.info('clear db...\n')
-        clear_db(self.get_db())
+        with self.lock_busy:    
+            clear_db(self.get_db())
+            self.clock = 0
 
     def locate_file(self, file_name: str):
         '''
         Return True if the file is in the database.
         '''
         print('locate...\n')
-        file = get_files_by_name(self.get_db(), file_name)
-        if file:
-            return True
-        return False
+        with self.lock_busy:
+            file = get_files_by_name(self.get_db(), file_name)
+            if file:
+                return True
+            return False
 
     def run(self, request: Tuple, id: int):
         '''
@@ -354,29 +363,28 @@ class Worker(BaseServer):
         '''
         Execute the request.
         '''
-        self.busy = True
-        match request[0]:
-            case 'add':
-                worker_log.info('add executed...\n')
-                self.results[id] = add(dirs_to_UploadFile(
-                    request[1]), request[2], self.get_db())
-            case 'delete':
-                worker_log.info('delete executed...\n')
-                self.results[id] = delete(request[1], self.get_db())
-            case 'list':
-                worker_log.info('list executed...\n')
-                self.results[id] = qlist(request[1], self.get_db())
-            case 'add-tags':
-                worker_log.info('add-tags executed...\n')
-                self.results[id] = add_tags(
-                    request[1], request[2], self.get_db())
-            case 'delete-tags':
-                worker_log.info('delete-tags executed...\n')
-                self.results[id] = delete_tags(
-                    request[1], request[2], self.get_db())
-            case _:
-                worker_log.info('Not job implemented\n')
-        self.busy = False
+        with self.lock_busy:
+            match request[0]:
+                case 'add':
+                    worker_log.info('add executed...\n')
+                    self.results[id] = add(dirs_to_UploadFile(
+                        request[1]), request[2], self.get_db())
+                case 'delete':
+                    worker_log.info('delete executed...\n')
+                    self.results[id] = delete(request[1], self.get_db())
+                case 'list':
+                    worker_log.info('list executed...\n')
+                    self.results[id] = qlist(request[1], self.get_db())
+                case 'add-tags':
+                    worker_log.info('add-tags executed...\n')
+                    self.results[id] = add_tags(
+                        request[1], request[2], self.get_db())
+                case 'delete-tags':
+                    worker_log.info('delete-tags executed...\n')
+                    self.results[id] = delete_tags(
+                        request[1], request[2], self.get_db())
+                case _:
+                    worker_log.info('Not job implemented\n')
     
     def kill_threads(self):
         '''
@@ -388,7 +396,7 @@ class Worker(BaseServer):
         except:
             self._background_thread = None
 
-
+    # FIX
     def replicate(self):
         '''
         Replicate the database to the slaves.
@@ -408,37 +416,34 @@ class Worker(BaseServer):
                 if w_clock < self.clock:
                     # if next request to slave is in requests
                     if next_clock in self.requests:
-                        # if slave is not busy
-                        if not w.busy:
-                            # FIX: run also delete requests, because modify rhe db
-                            # for add request
-                            if self.requests[next_clock][0] == ADD:
-                                worker_log.debug(f'replicate: run add\n')
-                                w.run(
-                                    self.requests[next_clock], next_clock)
+                        # FIX: run also delete requests, because modify rhe db
+                        # for add request
+                        if self.requests[next_clock][0] == ADD:
+                            worker_log.debug(f'replicate: run add\n')
+                            w.run(self.requests[next_clock], next_clock)
 
-                                # Wait responce
-                                timeout = self._timeout
-                                while True:
-                                    if not w.busy:
-                                        r = w.get_result(next_clock)
-                                        if r is not None:
-                                            break
-                                    else:
-                                        sleep(self._timeout)
-                                        timeout = increse_timeout(timeout)
-                            
-                            # just update for requests that don't modify the db
-                            else:
-                                worker_log.debug(f'replicate: set clock\n')
-                                w.clock = next_clock
+                            # Wait responce
+                            timeout = self._timeout
+                            while True:
+                                r = w.get_result(next_clock)
+                                if r is not None:
+                                    break
+                                else:
+                                    sleep(self._timeout)
+                                    timeout = increse_timeout(timeout)
+                        
+                        # just update for requests that don't modify the db
+                        else:
+                            worker_log.debug(f'replicate: set clock\n')
+                            w.clock = next_clock
                     else:
                         # copy all the db to the slave
                         # FIX: delete the database of the slave before export
-                        worker_log.info(
-                            f'replicate: Copy all db to {slave[0]}...\n')
+                        worker_log.info(f'replicate: Copy all db to {slave[0]}...')
                         files = self.export_db(1)[0]
+                        w.clear_db()
                         w.import_db(files, self.clock)
+                        worker_log.info(f'replicate: end copy to {slave[0]}\n')
             
             except Pyro5.errors.PyroError:
                 # if the slave is not reachable, regroup

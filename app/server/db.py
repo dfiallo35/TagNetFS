@@ -129,6 +129,8 @@ class DataBase:
                     try:
                         w = direct_connect(check_worker[1])
                         w.ping()
+                        if w.group != group:
+                            workers_alive['workers'].remove(check_worker)
                     except Pyro5.errors.PyroError:
                         workers_alive['workers'].remove(check_worker)
             
@@ -204,6 +206,7 @@ class DataBase:
                             w.master = worker
                             w.slaves = []
                             w.group = new_group
+                            w.clock = 0
                             added = True
                         except Pyro5.errors.PyroError:
                             sleep(self.timeout)
@@ -307,15 +310,9 @@ class DataBase:
         for workers, request in requests:
             for worker in workers:
                 w = direct_connect(worker[1])
-                while True:
-                    if not w.busy:
-                        db_log.info(
-                            f'assing jobs: send work to {worker[0]}...\n')
-                        w.run(request, id)
-                        break
-                    else:
-                        sleep(self.timeout)
-                        timeout = increse_timeout(timeout)
+                db_log.info(
+                    f'assing jobs: send work to {worker[0]}...\n')
+                w.run(request, id)
 
     # TODO: TRY
     # TODO: What to do with the losed request results
@@ -332,12 +329,11 @@ class DataBase:
                 try:
                     w = direct_connect(worker[1])
                     while True:
-                        if not w.busy:
-                            r = w.get_result(id)
-                            if r is not None:
-                                db_log.info(f'results: {r}\n')
-                                self.results[id].append(r)
-                                break
+                        r = w.get_result(id)
+                        if r is not None:
+                            db_log.info(f'results: {r}\n')
+                            self.results[id].append(r)
+                            break
                         else:
                             sleep(self.timeout)
                             timeout = increse_timeout(timeout)
