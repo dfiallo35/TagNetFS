@@ -6,7 +6,7 @@ services:
     container_name: node-1
     command: /bin/sh -c "echo 'export IP=10.0.0.2' >> ~/.bashrc && while sleep 1000; do :; done"
     networks:
-      default:
+      tagfs-net:
         ipv4_address: 10.0.0.2
     expose:
       - 9090
@@ -18,7 +18,7 @@ services:
     container_name: node-2
     command: /bin/sh -c "echo 'export IP=10.0.0.3' >> ~/.bashrc && while sleep 1000; do :; done"
     networks:
-      default:
+      tagfs-net:
         ipv4_address: 10.0.0.3
     expose:
       - 9090
@@ -30,7 +30,7 @@ services:
     container_name: node-3
     command: /bin/sh -c "echo 'export IP=10.0.0.4' >> ~/.bashrc && while sleep 1000; do :; done"
     networks:
-      default:
+      tagfs-net:
         ipv4_address: 10.0.0.4
     expose:
       - 9090
@@ -42,7 +42,7 @@ services:
     container_name: node-4
     command: /bin/sh -c "echo 'export IP=10.0.0.5' >> ~/.bashrc && while sleep 1000; do :; done"
     networks:
-      default:
+      tagfs-net:
         ipv4_address: 10.0.0.5
     expose:
       - 9090
@@ -54,7 +54,7 @@ services:
     container_name: node-5
     command: /bin/sh -c "echo 'export IP=10.0.0.6' >> ~/.bashrc && while sleep 1000; do :; done"
     networks:
-      default:
+      tagfs-net:
         ipv4_address: 10.0.0.6
     expose:
       - 9090
@@ -66,7 +66,7 @@ services:
     container_name: node-6
     command: /bin/sh -c "echo 'export IP=10.0.0.7' >> ~/.bashrc && while sleep 1000; do :; done"
     networks:
-      default:
+      tagfs-net:
         ipv4_address: 10.0.0.7
     expose:
       - 9090
@@ -78,7 +78,7 @@ services:
     container_name: node-7
     command: /bin/sh -c "echo 'export IP=10.0.0.8' >> ~/.bashrc && while sleep 1000; do :; done"
     networks:
-      default:
+      tagfs-net:
         ipv4_address: 10.0.0.8
     expose:
       - 9090
@@ -90,14 +90,19 @@ services:
     container_name: node-8
     command: /bin/sh -c "echo 'export IP=10.0.0.9' >> ~/.bashrc && while sleep 1000; do :; done"
     networks:
-      default:
+      tagfs-net:
         ipv4_address: 10.0.0.9
     expose:
       - 9090
     ports:
       - 8087:9090
 
+
+
 networks:
-  default:
-    external: true
-    name: tagfs-net
+  tagfs-net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.0.0/16

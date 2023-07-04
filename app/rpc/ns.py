@@ -5,9 +5,6 @@ import contextlib
 from time import sleep
 
 import Pyro5.errors
-from time import sleep
-
-import Pyro5.errors
 from Pyro5 import config
 from Pyro5 import socketutil
 from Pyro5.api import Daemon
@@ -16,15 +13,14 @@ from Pyro5.nameserver import NameServerDaemon, BroadcastServer
 
 from app.utils.thread import Kthread
 from app.utils.constant import *
-from app.server.base_server import  *
+from app.server.base_server import BaseServer
+
 
 class Leader(BaseServer):
     def __init__(self, ip: str, port: str):
         self.id = ...
         self.IP = ip
         self.PORT = port
-
-        self._timeout = 1
 
         self._timeout = 1
 
@@ -38,25 +34,22 @@ class Leader(BaseServer):
         self.nsUri = self.daemon.uriFor(self.daemon.nameserver)
         self.internalUri = self.daemon.uriFor(
             self.daemon.nameserver, nat=False)
-        self.internalUri = self.daemon.uriFor(
-            self.daemon.nameserver, nat=False)
 
-        self.bcserver = BroadcastServer(self.nsUri)
+        self.bcserver = BroadcastServer(self.nsUri, '10.0.255.255')
         print("Broadcast server running on {}".format(self.bcserver.locationStr))
         self.bcserver.runInThread()
-
 
         print("NS running on {}".format(str(self.daemon.locationStr)))
         print('URI = {}\n'.format(self.nsUri))
         sys.stdout.flush()
 
         # PING
-        self._ping = Kthread(
+        self._ping_thread = Kthread(
             target=self.ping_alive,
             daemon=True
         )
-        self._ping.start()
-
+        self._ping_thread.start()
+    
     def ping(self):
         return PING
 
@@ -70,18 +63,30 @@ class Leader(BaseServer):
                 self.bcserver.close()
         print("NS shut down.")
 
-
     def run_daemon(self):
         self.daemon_thread.start()
 
-
     def kill_daemon(self):
-        # self.daemon.shutdown()
-        self.daemon.close()
-        if self.bcserver is not None:
-            self.bcserver.close()
-        self.daemon_thread.join()
-
+        try:
+            self.daemon.shutdown()
+            self.daemon.close()
+            if self.bcserver is not None:
+                self.bcserver.close()
+        except:
+            pass
+        
+    
+    def kill_threads(self):
+        try:
+            self.daemon_thread.kill()
+            if self.daemon_thread.is_alive():
+                self.daemon_thread.join()
+            self._ping_thread.kill()
+            if self._ping_thread.is_alive():
+                self._ping_thread.join()
+        except:
+            pass
+    
     def register(self, name: str, f):
         uri = self.daemon.register(f, force=True)
         self.daemon.nameserver.register(name, uri)
@@ -98,12 +103,13 @@ class Leader(BaseServer):
                     try:
                         p = direct_connect(uri)
                         p.ping()
-                    except Pyro5.errors.CommunicationError:
+                    except Pyro5.errors.PyroError:
                         print(f"Object {name} is not alive, unregistering...")
                         ns.remove(name)
                 sleep(self._timeout)
             except Pyro5.errors.NamingError:
                 sleep(self._timeout)
+
 
 
 class Node(BaseServer):
@@ -127,10 +133,6 @@ class Node(BaseServer):
     def ping(self):
         return PING
 
-
-    def ping(self):
-        return PING
-
     def request(self):
         try:
             self.daemon.requestLoop()
@@ -140,7 +142,6 @@ class Node(BaseServer):
 
     def run_daemon(self):
         self.daemon_thread.start()
-
 
     def kill_daemon(self):
         try:
@@ -157,19 +158,14 @@ class Node(BaseServer):
             pass
     
     # FIX: update ns?
-        # self.daemon.shutdown()
-        self.daemon.close()
-        self.daemon_thread.join()
-
-    # FIX: update ns?
-    def register(self, name: str, f):
-        uri = self.daemon.register(f, force=True)
+    def register(self, name: str, f, id: str=None):
+        uri = self.daemon.register(f, force=True, objectId=id)
         self.ns.register(name, uri)
+        return uri
 
 
 def locate_ns() -> Proxy:
     port = config.NS_BCPORT
-
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -177,11 +173,10 @@ def locate_ns() -> Proxy:
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 0)
     sock.settimeout(0.7)
 
-
     ns = []
     for _ in range(3):
         try:
-            for bcaddr in config.BROADCAST_ADDRS:
+            for bcaddr in ['10.0.255.255']:
                 try:
                     sock.sendto(b"GET_NSURI", 0, (bcaddr, port))
                 except socket.error as x:
@@ -208,7 +203,6 @@ def locate_ns() -> Proxy:
         sock.shutdown(socket.SHUT_RDWR)
     sock.close()
     raise Pyro5.errors.NamingError
-    raise Pyro5.errors.NamingError
 
 
 def connect(ns: Proxy, name: str) -> Proxy:
@@ -218,15 +212,6 @@ def connect(ns: Proxy, name: str) -> Proxy:
     uri = ns.lookup(name)
     f = Proxy(uri)
     return f
-
-
-def direct_connect(uri: str):
-    '''
-    Get the element registered in the ns with the given uri.
-    '''
-    f = Proxy(uri)
-    return f
-
 
 
 def direct_connect(uri: str):
