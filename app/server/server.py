@@ -22,7 +22,6 @@ server_log = log('server', logging.INFO)
 # TODO: Differents logs
 # TODO: file for configs
 # TODO: change the needed try to repeat the proces n times if exception
-# TODO: save a file with te node state?
 
 # FIX: new coordinator and functions
 

@@ -203,6 +203,7 @@ class Worker(BaseServer):
         while not self.group:
             try:
                 self.regroup()
+                self.clear_db()
                 self.run_threads()
             except Pyro5.errors.PyroError:
                 sleep(self._timeout)
@@ -218,6 +219,7 @@ class Worker(BaseServer):
         self._background_thread.start()
 
     # FIX: when new node entrer the group
+    # FIX: getting old database data from new nodes
     def regroup(self):
         '''
         Regroup the worker to a group.
@@ -286,7 +288,7 @@ class Worker(BaseServer):
             else:
                 worker_log.debug('replicate...\n')
                 self.replicate()
-            sleep(1)
+            sleep(self._timeout)
 
 
     def get_result(self, id: int):
@@ -418,8 +420,8 @@ class Worker(BaseServer):
                     if next_clock in self.requests:
                         # FIX: run also delete requests, because modify rhe db
                         # for add request
-                        if self.requests[next_clock][0] == ADD:
-                            worker_log.debug(f'replicate: run add\n')
+                        if self.requests[next_clock][0] != LIST:
+                            worker_log.debug(f'replicate: run {self.requests[next_clock][0]}\n')
                             w.run(self.requests[next_clock], next_clock)
 
                             # Wait responce
