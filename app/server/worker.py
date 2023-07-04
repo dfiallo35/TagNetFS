@@ -36,7 +36,6 @@ class Worker(BaseServer):
         self.results: Dict[int, dict] = {}
         self._timeout = 0.1
         self._job_id = 0
-        self._busy = False
 
         # master-slave data
         self._group = None
@@ -46,7 +45,7 @@ class Worker(BaseServer):
 
         # locks
         self.lock_clock = Lock()
-        self.lock_busy = Lock()
+        self.lock_working = Lock()
         self.lock_master = Lock()
         self.lock_slaves = Lock()
         self.lock_requests = Lock()
@@ -156,28 +155,13 @@ class Worker(BaseServer):
         '''
         return self._group
 
+    # TODO: notify master the group change
     @group.setter
     def group(self, group: int):
         '''
         Set the group.
         '''
         self._group = group
-
-    @property
-    def busy(self):
-        '''
-        Return True if the worker is busy.
-        '''
-        with self.lock_busy:
-            return self._busy
-
-    @busy.setter
-    def busy(self, busy: bool):
-        '''
-        Set the busy status of the worker.
-        '''
-        with self.lock_busy:
-            self._busy = busy
 
     @property
     def requests(self):
@@ -202,6 +186,7 @@ class Worker(BaseServer):
         '''
         while not self.group:
             try:
+                worker_log.info('register node in db...')
                 self.regroup()
                 self.clear_db()
                 self.run_threads()
@@ -220,6 +205,7 @@ class Worker(BaseServer):
 
     # FIX: when new node entrer the group
     # FIX: getting old database data from new nodes
+    # FIX: why regroup twice
     def regroup(self):
         '''
         Regroup the worker to a group.
@@ -245,14 +231,24 @@ class Worker(BaseServer):
                 except Pyro5.errors.PyroError:
                     pass
         
-        # tell the slaves that this is the new master
+        # update the worker
+        self.group = group
+        self.master = master
+        self.slaves = slaves
+
+        # update slaves
         if master == self.worker:
             for slave in slaves:
                 try:
                     s = direct_connect(slave[1])
-                    s.master = master
+                    slave_master = s.master
+                    if slave_master != master:
+                        s.master = master
+                        s.clock = 0
+                    s.slaves = []
+                    s.group = group
                 except Pyro5.errors.PyroError:
-                    pass
+                    self.slaves.remove(slave)
         # tell the master that this is a new slave
         else:
             completed = False
@@ -264,10 +260,6 @@ class Worker(BaseServer):
                 except Pyro5.errors.PyroError:
                     sleep(self._timeout)
         
-        # update the worker
-        self.group = group
-        self.master = master
-        self.slaves = slaves
         db.workers_status()
 
     def background(self):
@@ -282,7 +274,7 @@ class Worker(BaseServer):
                     m = direct_connect(self.master[1])
                     m.ping()
                 except Pyro5.errors.PyroError:
-                    worker_log.debug('no master, regroup\n')
+                    worker_log.info('no master, regroup')
                     self.regroup()
             # if the worker is the master, try replicating
             else:
@@ -295,7 +287,7 @@ class Worker(BaseServer):
         '''
         Return the result of the request.
         '''
-        with self.lock_busy:
+        with self.lock_working:
             if self.results.get(id) is not None:
                 return self.results.pop(id)
             return None
@@ -310,7 +302,7 @@ class Worker(BaseServer):
         '''
         Export the database dividing it in n parts.
         '''
-        with self.lock_busy:
+        with self.lock_working:
             worker_log.info('export db...\n')
             return divide_db(self.get_db(), n)
 
@@ -318,8 +310,8 @@ class Worker(BaseServer):
         '''
         Import the database and set the clock.
         '''
-        worker_log.info('import files...\n')
-        with self.lock_busy:
+        with self.lock_working:
+            worker_log.info('import files...\n')
             save_files(self.get_db(), files)
             with self.lock_requests:
                 self._requests = {}
@@ -332,8 +324,8 @@ class Worker(BaseServer):
         '''
         Clear the database.
         '''
-        worker_log.info('clear db...\n')
-        with self.lock_busy:    
+        with self.lock_working:
+            worker_log.info('clear db...\n')
             clear_db(self.get_db())
             self.clock = 0
 
@@ -341,8 +333,8 @@ class Worker(BaseServer):
         '''
         Return True if the file is in the database.
         '''
-        print('locate...\n')
-        with self.lock_busy:
+        with self.lock_working:
+            print('locate...\n')
             file = get_files_by_name(self.get_db(), file_name)
             if file:
                 return True
@@ -365,7 +357,7 @@ class Worker(BaseServer):
         '''
         Execute the request.
         '''
-        with self.lock_busy:
+        with self.lock_working:
             match request[0]:
                 case 'add':
                     worker_log.info('add executed...\n')
@@ -406,6 +398,7 @@ class Worker(BaseServer):
         for slave in self.slaves:
             # if this master is not the master of the slave go regroup
             if not self.own_slave(slave):
+                worker_log.info(f'replicate: slave: {slave[0]} belongs to another group')
                 self.regroup()
                 break
             try:
@@ -418,8 +411,7 @@ class Worker(BaseServer):
                 if w_clock < self.clock:
                     # if next request to slave is in requests
                     if next_clock in self.requests:
-                        # FIX: run also delete requests, because modify rhe db
-                        # for add request
+                        # request that modify the db, all except LIST
                         if self.requests[next_clock][0] != LIST:
                             worker_log.debug(f'replicate: run {self.requests[next_clock][0]}\n')
                             w.run(self.requests[next_clock], next_clock)
@@ -434,9 +426,9 @@ class Worker(BaseServer):
                                     sleep(self._timeout)
                                     timeout = increse_timeout(timeout)
                         
-                        # just update for requests that don't modify the db
+                        # just update for requests that don't modify the db, LIST request
                         else:
-                            worker_log.debug(f'replicate: set clock\n')
+                            worker_log.info(f'replicate: set clock\n')
                             w.clock = next_clock
                     else:
                         # copy all the db to the slave
@@ -449,4 +441,5 @@ class Worker(BaseServer):
             
             except Pyro5.errors.PyroError:
                 # if the slave is not reachable, regroup
+                worker_log.info(f'replicate: slave: {slave[0]} disconected')
                 self.regroup()

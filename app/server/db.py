@@ -198,18 +198,6 @@ class DataBase:
                     # get random worker from the group with more workers than groups_len
                     take_worker = random.choice([_w for _w in groups[last_group]['workers'] if _w != groups[last_group]['master']])
                     
-                    # update the take_worker
-                    added = False
-                    while not added:
-                        try:
-                            w = direct_connect(take_worker[1])
-                            w.master = worker
-                            w.slaves = []
-                            w.group = new_group
-                            w.clock = 0
-                            added = True
-                        except Pyro5.errors.PyroError:
-                            sleep(self.timeout)
                     groups[new_group] = {'master':worker, 'workers':[worker, take_worker]}
                     return new_group, worker, [take_worker]
                 
