@@ -1,0 +1,10 @@
+python3 client.py add -f ./example_database/flow.py -t DAA
+python3 client.py add -f ./example_database/graph_brute_force.py -t DAA  
+python3 client.py add -f ./example_database/queen_bohemian_rhapsody.mp3 -t music
+python3 client.py add -f ./example_database/n.py -f ./example_database/t.md -f ./example_database/a.txt  -t something
+python3 client.py add -f ./example_database/rasterio.png -f ./example_database/resumen.md -t ML
+python3 client.py add -f ./example_database/themes.md -f ./example_database/links.md  -t ML
+python3 client.py add -f ./example_database/change_point.ipynb -f ./example_database/CP_Lesson.pdf -t optative
+python3 client.py add -f ./example_database/notes.md -t distributed
+python3 client.py add -f ./example_database/Incertidumbre.pdf -t IA
+python3 client.py add -f ./example_database/Instrumental.xspf -t music -t something

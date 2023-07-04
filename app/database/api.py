@@ -34,51 +34,30 @@ def get_db(seccion):
     finally:
         db.close()
 
-
-
 @app.post('/add', summary='Copy the files to the system and assign them the tags')
 def add(
         file_list: Annotated[List[UploadFile], File(...)],
         tag_list: Annotated[List[str], Form(...)],
         db: Session = Depends(get_db)
     ):
+    files = [FileCreate(file=f, name=f.filename) for f in file_list]
+    tags = [TagCreate(name=t) for t in tag_list]
     
-    for file in [FileCreate(file=f, name=f.filename) for f in file_list]:
-        db_file = crud.create_file(db, file=file)
-        for tag in [TagCreate(name=t) for t in tag_list]:
-            db_tag = crud.get_tag_by_name(db, tag.name)
-            if db_tag:
-                db_file.tags.append(db_tag)
-            else:
-                db_tag = crud.create_tag(db, tag=tag)
-                db_file.tags.append(db_tag)
-    db.commit()
-
-    return {"message": "success"}
-
-
+    return crud._add(db, files=files, tags=tags)
 
 @app.delete('/delete', summary='Delete all the files that match the tag query')
 def delete(
         tag_query: Annotated[List[str], Query()],
         db: Session = Depends(get_db)
     ):
-    db_files = crud.get_files_by_tag_query(db, tag_query)
-    for db_file in db_files:
-        db.delete(db_file)
-    db.commit()
-    return {"message": "success"}
-
+    return crud._delete(db, tag_query=tag_query)
 
 @app.get('/list/', response_model=List[schemas.File], summary='List the name and the tags of every file that match the tag query')
 def qlist(
         tag_query: Annotated[List[str], Query()],
         db: Session = Depends(get_db)
     ):
-    db_files = crud.get_files_by_tag_query(db, tag_query)
-    return {file.name:[tag.name for tag in file.tags] for file in db_files}
-
-
+    return crud._list(db, tag_query=tag_query)
 
 @app.post('/add_tags', summary='Add the tags from the tag list to the files that match the tag query')
 def add_tags(
@@ -86,19 +65,7 @@ def add_tags(
         tag_list: List[str],
         db: Session = Depends(get_db)
     ):
-    db_files = crud.get_files_by_tag_query(db, tag_query)
-    for db_file in db_files:
-        for tag in tag_list:
-            db_tag = crud.get_tag_by_name(db, tag)
-            if db_tag:
-                db_file.tags.append(db_tag)
-            else:
-                db_tag = crud.create_tag(db, tag=schemas.TagCreate(name=tag))
-                db_file.tags.append(db_tag)
-    db.commit()
-    return {"message": "success"}
-
-
+    return crud._add_tags(db, tag_query=tag_query, tag_list=tag_list)
 
 @app.delete('/delete_tags', summary='Delete the tags from the tag list to the files that match the tag query')
 def delete_tags(
@@ -106,17 +73,7 @@ def delete_tags(
         tag_list: Annotated[List[str], Query()],
         db: Session = Depends(get_db)
     ):
-    db_files = crud.get_files_by_tag_query(db, tag_query)
-    for db_file in db_files:
-        for tag in tag_list:
-            db_tag = crud.get_tag_by_name(db, tag)
-            if db_tag:
-                db_file.tags.remove(db_tag)
-    db.commit()
-    return {"message": "success"}
-
-
-
+    return crud._delete_tags(db, tag_query=tag_query, tag_list=tag_list)
 
 @app.get("/")
 def main():

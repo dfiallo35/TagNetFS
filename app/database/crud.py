@@ -1,11 +1,83 @@
 from os import makedirs
+import shutil
 from sqlalchemy.orm import Session
 from os.path import join
 
+from fastapi import Query
+from sqlalchemy.orm import Session
+from typing import List, Annotated, Tuple
+
 from . import models, schemas, tools
 from app.utils.utils import *
+from app.database.schemas import TagCreate, FileCreate
 
 
+
+
+def _add(
+        db: Session,
+        files: List[schemas.FileCreate],
+        tags: List[schemas.TagCreate],
+):
+    for file in files:
+        db_file = create_file(db, file=file)
+        for tag in tags:
+            db_tag = get_tag_by_name(db, tag.name)
+            if db_tag:
+                db_file.tags.append(db_tag)
+            else:
+                db_tag = create_tag(db, tag=tag)
+                db_file.tags.append(db_tag)
+    db.commit()
+    return {"message": "success"}
+
+def _delete(
+        db: Session,
+        tag_query: Annotated[List[str], Query()]
+):
+    db_files = get_files_by_tag_query(db, tag_query)
+    for db_file in db_files:
+        db.delete(db_file)
+    db.commit()
+    return {"message": "success"}
+
+def _list(
+        db: Session,
+        tag_query: Annotated[List[str], Query()],
+    ):
+    db_files = get_files_by_tag_query(db, tag_query)
+    return {file.name:[tag.name for tag in file.tags] for file in db_files}
+
+def _add_tags(
+        db: Session,
+        tag_query: List[str],
+        tag_list: List[str],
+    ):
+    db_files = get_files_by_tag_query(db, tag_query)
+    for db_file in db_files:
+        for tag in tag_list:
+            db_tag = get_tag_by_name(db, tag)
+            if db_tag:
+                db_file.tags.append(db_tag)
+            else:
+                db_tag = create_tag(db, tag=schemas.TagCreate(name=tag))
+                db_file.tags.append(db_tag)
+    db.commit()
+    return {"message": "success"}
+
+def _delete_tags(
+        db: Session,
+        tag_query: Annotated[List[str], Query()],
+        tag_list: Annotated[List[str], Query()],
+):
+    db_files = get_files_by_tag_query(db, tag_query)
+    for db_file in db_files:
+        for tag in tag_list:
+            db_tag = get_tag_by_name(db, tag)
+            if db_tag:
+                db_file.tags.remove(db_tag)
+    db.commit()
+    return {"message": "success"}
 
 
 def create_tag(db: Session, tag: schemas.TagCreate):
@@ -70,7 +142,7 @@ def all_files(db: Session):
     Get all data from db by file and his tags.
     '''
     files = db.query(models.File).all()
-    files = [(file, tools.get_file(join('files', file.name))) for file in files]
+    files = [((tools.get_file(join('files', file.name)), file.name), [_t.name for _t in file.tags]) for file in files]
     return files
 
 def divide_db(db: Session, pieces: int):
@@ -80,22 +152,18 @@ def divide_db(db: Session, pieces: int):
     files = split(all_files(db), pieces)
     return files
 
-def save_files(db: Session, files: List[models.File]):
+def save_files(db: Session, files: List[Tuple[UploadFile, str]]):
     '''
     Save in the db the file list and his tags.
     '''
-    _files = []
-    for file, file_content in files:
-        _files.append((file_content, file.name))
-        db.add(file)
-        db.commit()
-        db.refresh(file)
-    _files = tools.dirs_to_UploadFile(_files)
-    for f in _files:
-        tools.copy_file(f, 'files')
+    for file, tags in files:
+        _add(db, [FileCreate(file=tools.dir_to_UploadFile((file[0], file[1])), name=file[1])], [TagCreate(name=t) for t in tags])
     
 
 def clear_db(db: Session):
+    query = db.query(models.File)
+    if list(query):
+        query.delete()
     if os.path.exists('files'):
-        os.remove('files')
-    db.query(models.File).delete()
+        shutil.rmtree('files')
+

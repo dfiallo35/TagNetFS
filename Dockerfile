@@ -10,3 +10,5 @@ RUN rm requirements.txt
 COPY ./server.py .
 COPY ./client.py .
 COPY ./app ./app
+COPY ./create_database.txt .
+COPY ./example_database ./example_database

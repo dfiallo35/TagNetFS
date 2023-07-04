@@ -4,8 +4,11 @@ from io import BytesIO
 
 from app.utils.utils import decode
 
-def dirs_to_UploadFile(file_list: str):
+def dirs_to_UploadFile(file_list: list[tuple]):
     return [UploadFile(file=f, filename=n) for f, n in file_list]
+
+def dir_to_UploadFile(file: tuple):
+    return UploadFile(file=file[0], filename=file[1])
 
 def copy_file(file: UploadFile, path: str):
     with open(join(path, file.filename), 'wb') as f:
