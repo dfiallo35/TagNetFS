@@ -1,7 +1,7 @@
 import Pyro5.api
 import Pyro5.errors
 from time import sleep
-from threading import Lock
+from multiprocessing import Lock
 from typing import Tuple, List, Dict
 
 from app.database.api import *
@@ -35,7 +35,9 @@ class Worker(BaseServer):
         self.database = DatabaseSession()
         self._requests = {}
         self.results: Dict[int, dict] = {}
-        self._timeout = 0.1
+        # self._timeout = 0.1
+        self._timeout=read_config()["global_timeout"]
+
         self._job_id = 0
 
         # master-slave data

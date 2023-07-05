@@ -37,7 +37,8 @@ class Server():
 
         # node state
         self._alive = True
-        self._timeout: int = 2
+        # self._timeout: int = 2
+        self._timeout = read_config()["elections_timeout"]
         self.elections_thread: Kthread = None
         self._coordinator: Server = None
 
