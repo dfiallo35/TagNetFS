@@ -12,4 +12,3 @@ COPY ./client.py .
 COPY ./app ./app
 COPY ./create_database.txt .
 COPY ./example_database ./example_database
-COPY ./configs.json .

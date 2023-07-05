@@ -19,6 +19,7 @@ worker_log = log('worker', logging.INFO)
 
 
 # FIX: different id than db class
+# FIX: unregister slave
 
 @Pyro5.api.expose
 class Worker(BaseServer):
@@ -34,9 +35,7 @@ class Worker(BaseServer):
         self.database = DatabaseSession()
         self._requests = {}
         self.results: Dict[int, dict] = {}
-
-        # self._timeout = 0.1
-        self._timeout=read_config()["global_timeout"]
+        self._timeout = 0.1
         self._job_id = 0
 
         # master-slave data
@@ -238,6 +237,7 @@ class Worker(BaseServer):
         self.master = master
         self.slaves = slaves
 
+        #FIX:X TRY
         # update slaves
         if master == self.worker:
             for slave in slaves:
@@ -247,10 +247,12 @@ class Worker(BaseServer):
                     if slave_master != master:
                         s.master = master
                         s.clock = 0
+                        s.clear_db()
                     s.slaves = []
                     s.group = group
                 except Pyro5.errors.PyroError:
-                    self.slaves.remove(slave)
+                    if slave in self.slaves:
+                        self.slaves.remove(slave)
         # tell the master that this is a new slave
         else:
             completed = False
@@ -262,7 +264,7 @@ class Worker(BaseServer):
                 except Pyro5.errors.PyroError:
                     sleep(self._timeout)
         
-        db.workers_status()
+        # db.workers_status()
 
     def background(self):
         '''
@@ -441,7 +443,8 @@ class Worker(BaseServer):
                         w.import_db(files, self.clock)
                         worker_log.info(f'replicate: end copy to {slave[0]}\n')
             
-            except Pyro5.errors.PyroError:
+            except Pyro5.errors.PyroError as e:
                 # if the slave is not reachable, regroup
                 worker_log.info(f'replicate: slave: {slave[0]} disconected')
+                print(e)
                 self.regroup()

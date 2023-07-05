@@ -1,7 +1,7 @@
 import socket
 import logging
 from time import sleep
-from threading import Lock
+from multiprocessing import Lock
 
 import Pyro5.api
 import Pyro5.server
@@ -37,9 +37,7 @@ class Server():
 
         # node state
         self._alive = True
-        # self._timeout: int = 2
-        self._timeout = read_config()["elections_timeout"]
-        self._in_elections = False
+        self._timeout: int = 2
         self.elections_thread: Kthread = None
         self._coordinator: Server = None
 
@@ -108,22 +106,6 @@ class Server():
         Return if the node is alive.
         '''
         return self._alive
-
-    @property
-    def in_elections(self):
-        '''
-        Return if the node is in elections.
-        '''
-        with self.lock_elections:
-            return self._in_elections
-
-    @in_elections.setter
-    def in_elections(self, elections: bool):
-        '''
-        Set if the node is in elections.
-        '''
-        with self.lock_elections:
-            self._in_elections = elections
 
     def run(self):
         '''
@@ -227,9 +209,8 @@ class Server():
         '''
         Go elections.
         '''
-        
+
         # find the coordinator
-        self.in_elections = True
         coordinator = self.find_coordinator()
         self._coordinator = coordinator
 
@@ -244,7 +225,6 @@ class Server():
 
         except Pyro5.errors.PyroError:
             self.election()
-        self.in_elections = False
 
     def kill(self):
         '''

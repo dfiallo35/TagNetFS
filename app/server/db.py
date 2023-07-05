@@ -2,7 +2,7 @@ import random
 # import pandas as pd
 from math import ceil
 from time import sleep
-from threading import Lock
+from multiprocessing import Lock
 from typing import Tuple, List, Dict
 
 from app.rpc.ns import *
@@ -28,10 +28,8 @@ class DataBase:
         self.results: Dict[int, List[dict]] = {}
 
         # groups info
-        # self._groups_len = 2
-        self._groups_len = read_config()["groups_len"]
-        # self._timeout_groups = 2
-        self._timeout_groups=read_config()["timeout_groups"]
+        self._groups_len = 2
+        self._timeout_groups = 2
         self._groups: Dict[int, Dict[str, Tuple|List[Tuple]]] = {}
         self._group_workers = set()
 

@@ -12,6 +12,11 @@ import json
 
 CONFIG_PATH = 'configs.json'#'config.yml'
 
+def encode(data: bytes):
+    return base64.b64encode(data)
+
+def decode(data: bytes):
+    return base64.b64decode(data)
 
 def read_config(filepath = CONFIG_PATH):
     with open(filepath, 'r') as file:
