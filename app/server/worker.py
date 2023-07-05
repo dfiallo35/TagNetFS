@@ -237,6 +237,7 @@ class Worker(BaseServer):
         self.master = master
         self.slaves = slaves
 
+        #FIX:X TRY
         # update slaves
         if master == self.worker:
             for slave in slaves:
@@ -250,7 +251,8 @@ class Worker(BaseServer):
                     s.slaves = []
                     s.group = group
                 except Pyro5.errors.PyroError:
-                    self.slaves.remove(slave)
+                    if slave in self.slaves:
+                        self.slaves.remove(slave)
         # tell the master that this is a new slave
         else:
             completed = False

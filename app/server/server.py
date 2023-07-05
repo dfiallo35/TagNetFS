@@ -1,7 +1,7 @@
 import socket
 import logging
 from time import sleep
-from threading import Lock
+from multiprocessing import Lock
 
 import Pyro5.api
 import Pyro5.server

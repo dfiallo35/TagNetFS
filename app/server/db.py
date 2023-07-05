@@ -2,7 +2,7 @@ import random
 # import pandas as pd
 from math import ceil
 from time import sleep
-from threading import Lock
+from multiprocessing import Lock
 from typing import Tuple, List, Dict
 
 from app.rpc.ns import *
