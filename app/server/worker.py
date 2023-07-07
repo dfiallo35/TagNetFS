@@ -19,7 +19,9 @@ worker_log = log('worker', logging.INFO)
 
 
 # FIX: different id than db class
-# FIX: unregister slave
+# TODO: si se cambia el clock pero no se ha copiado la db que pasa en la replicacion
+
+# TODO: what happend with incomplete data?
 
 @Pyro5.api.expose
 class Worker(BaseServer):

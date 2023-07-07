@@ -37,7 +37,6 @@ class Server():
 
         # node state
         self._alive = True
-        # self._timeout: int = 2
         self._timeout = read_config()["elections_timeout"]
         self.elections_thread: Kthread = None
         self._coordinator: Server = None
@@ -181,7 +180,7 @@ class Server():
                     ns = locate_ns()
                     coordinator = connect(ns, 'leader')
                     return coordinator
-                except Pyro5.errors.NamingError:
+                except Pyro5.errors.PyroError:
                     return self
             
             # if the coordinator is alive
@@ -192,7 +191,7 @@ class Server():
                     if ns and ns._pyroUri.host != self.coordinator.host:
                         coordinator = connect(ns, 'leader')
                         return coordinator
-                except Pyro5.errors.NamingError:
+                except Pyro5.errors.PyroError:
                     return self._coordinator
 
         except Pyro5.errors.PyroError:
@@ -202,7 +201,7 @@ class Server():
                 coordinator = connect(ns, 'leader')
                 return coordinator
             
-            except Pyro5.errors.NamingError:
+            except Pyro5.errors.PyroError:
                 # there is no coordinator
                 return self
 

@@ -14,16 +14,9 @@ class Dispatcher(BaseServer):
     def ping(self):
         return PING
 
-    # FIX: make it async?
-    # FIX: TRY
     def request(self, request: Tuple):
         results = self.db.execute(request)
         return results
 
     def kill_threads(self):
-        try:
-            self.db.groups_thread.kill()
-            if self.db.groups_thread.is_alive():
-                self.db.groups_thread.join()
-        except:
-            pass
+        ...

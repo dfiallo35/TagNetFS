@@ -1,6 +1,4 @@
 import random
-# import pandas as pd
-from math import ceil
 from time import sleep
 from multiprocessing import Lock
 from typing import Tuple, List, Dict
@@ -15,7 +13,7 @@ db_log = log('data-base', logging.INFO)
 
 
 # TODO: if dont get responce from server, repeat the requets to other server from the same group
-# BUG: loose data when eliminate a group
+# BUG: lose data when eliminate a group
 
 @Pyro5.api.expose
 class DataBase:
@@ -235,18 +233,22 @@ class DataBase:
         self._requests[id] = requests    
 
     def workers_status(self):
-        workers = self.workers
-        print('--------------------------------------------------')
-        for worker in workers:
-            w = direct_connect(worker[1])
-            print(worker[0])
-            status: dict = w.status
-            for i in status.keys():
-                print(f'  {i}: {status[i]}')
-            print()
-        print('--------------------------------------------------')
+        with self.lock_groups:
+            workers = self.workers
+            print('--------------------------------------------------')
+            for worker in workers:
+                w = direct_connect(worker[1])
+                print(worker[0])
+                status: dict = w.status
+                for i in status.keys():
+                    print(f'  {i}: {status[i]}')
+                print()
+            print('--------------------------------------------------')
 
     def locate_file(self, workers: List[Tuple], file_name: str):
+        '''
+        Locate the file in the db.
+        '''
         db_log.debug('execute: locate file...')
         for worker in workers:
             w = direct_connect(worker[1])
