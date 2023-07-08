@@ -41,7 +41,7 @@ class Leader(BaseServer):
         # print("Broadcast server running on {}".format(self.bcserver.locationStr))
         self.bcserver.runInThread()
 
-        # print("NS running on {}".format(str(self.daemon.locationStr)))
+        print("NS running on {}".format(str(self.daemon.locationStr)))
         # print('URI = {}\n'.format(self.nsUri))
         sys.stdout.flush()
 
@@ -90,8 +90,24 @@ class Leader(BaseServer):
             pass
     
     def register(self, name: str, f, id: str=None):
-        uri = self.daemon.register(f, force=True)
-        self.daemon.nameserver.register(name, uri)
+        registred = False
+        while not registred:
+            try:
+                uri = self.daemon.register(f, force=True)
+                self.daemon.nameserver.register(name, uri)
+                registred = True
+            except Pyro5.errors.PyroError:
+                sleep(self._timeout)
+    
+    def unregister(self, name: str):
+        deleted = False
+        while not deleted:
+            try:
+                ns = self.daemon.nameserver
+                ns.remove(name)
+                deleted = True
+            except Pyro5.errors.PyroError:
+                sleep(self._timeout)
 
     def ping_alive(self):
         '''
@@ -99,7 +115,7 @@ class Leader(BaseServer):
         '''
         while True:
             try:
-                ns = locate_ns()
+                ns = self.daemon.nameserver
                 objects = list(ns.list().items())
                 for name, uri in objects:
                     try:

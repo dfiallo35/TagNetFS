@@ -20,8 +20,9 @@ worker_log = log('worker', logging.DEBUG)
 
 
 # FIX: different id than db class
-# TODO: si se cambia el clock pero no se ha copiado la db que pasa en la replicacion
 
+# TODO: si se cambia el clock pero no se ha copiado la db que pasa en la replicacion
+# TODO: rollback if brake connection or separated commit?
 # TODO: what happend with incomplete data?
 
 @Pyro5.api.expose
@@ -60,6 +61,10 @@ class Worker(BaseServer):
         self.lock_slaves = Lock()
         self.lock_requests = Lock()
         self.lock_succ = Lock()
+
+        # register
+        self.server.register(self.worker_name, self, str(self.id))
+        self.run_worker()
 
 
     # STATUS
@@ -356,8 +361,13 @@ class Worker(BaseServer):
 
         return new_group, master_len
     
+    def update_worker(self, master: Tuple, group: Tuple, slave: Tuple=None):
+        self.master = master
+        self.group = group
+        if slave:
+            self.set_slave(slave)
 
-    def register_worker(self):
+    def run_worker(self):
         '''
         Register the worker to the name server and the database.
         '''
@@ -376,23 +386,19 @@ class Worker(BaseServer):
                         if first_group[1] < self.groups_len:
                             worker_log.debug('less workers than groups_len...')
                             master = first_group[0]
-                            self.master = master
                             m = direct_connect(master[1])
-                            self.group = m.group
+                            self.update_worker(master, m.group)
                             m.set_slave(self.worker)
-                            self.succ = m.succ
                             m.update_succ()
                         
                         # if there is a group with more workers than groups_len
                         elif last_group[1] > self.groups_len:
                             worker_log.debug('more workers than groups_len...')
-                            self.master = self.worker
-                            m = direct_connect(last_group[0][1])
-                            self.group = m.group
                             # TODO: clear db
+                            m = direct_connect(last_group[0][1])
                             new_slave = m.pop_slave(m.slaves[-1])
+                            self.update_worker(self.worker, m.group, new_slave)
                             s = direct_connect(new_slave[1])
-                            self.set_slave(new_slave)
                             s.change_master(self.worker, new_group, self.slaves)
                             self.register_master()
                             m.update_succ()
@@ -401,18 +407,15 @@ class Worker(BaseServer):
                         else:
                             worker_log.debug('all the groups have groups_len...')
                             master = first_group[0]
-                            self.master = master
                             m = direct_connect(master[1])
-                            self.group = m.group
+                            self.update_worker(master, m.group)
                             m.set_slave(self.worker)
-                            self.succ = m.succ
                             m.update_succ()
                     
                     # if there is no groups
                     else:
                         worker_log.debug('no groups...')
-                        self.master = self.worker
-                        self.group = new_group
+                        self.update_worker(self.worker, new_group)
                         self.register_master()
 
                 self.clear_db()
@@ -442,28 +445,23 @@ class Worker(BaseServer):
                     # TODO: generate groups if more workers than groups_len
                     first_group = master_len[0]
                     last_group = master_len[-1]
+                    master = first_group[0]
                     
                     if first_group[1] < self.groups_len:
                         worker_log.debug('less workers than groups_len...')  
-                        
                         self.replicate_to_masters()
-                        master = first_group[0]
-                        self.master = master
                         m = direct_connect(master[1])
-                        self.group = m.group
+                        self.update_worker(master, m.group)
                         m.set_slave(self.worker)
-                        self.succ = m.succ
                         m.update_succ()
                     
                     elif last_group[1] > self.groups_len:
                         worker_log.debug('more workers than groups_len...')
-                        self.master = self.worker
                         m = direct_connect(last_group[0][1])
-                        self.group = m.group
-                        # TODO: clear db
                         new_slave = m.pop_slave(m.slaves[-1])
+                        self.update_worker(self.worker, m.group, new_slave)
+                        # TODO: clear db
                         s = direct_connect(new_slave[1])
-                        self.set_slave(new_slave)
                         s.change_master(self.worker, new_group, self.slaves)
                         self.register_master()
                         m.update_succ()
@@ -471,14 +469,10 @@ class Worker(BaseServer):
                     else:
                         worker_log.debug('all the groups have groups_len...')
                         self.replicate_to_masters()
-                        master = first_group[0]
-                        self.master = master
                         m = direct_connect(master[1])
-                        self.group = m.group
+                        self.update_worker(master, m.group)
                         m.set_slave(self.worker)
-                        self.succ = m.succ
                         m.update_succ()
-
 
         # if not master    
         else:
@@ -496,28 +490,23 @@ class Worker(BaseServer):
                         worker_log.debug('exist masters...')
                         first_group = master_len[0]
                         last_group = master_len[-1]
+                        master = first_group[0]
                         
                         if first_group[1] < self.groups_len:
                             worker_log.debug('less workers than groups_len...')  
-                            
                             self.replicate_to_masters()
-                            master = first_group[0]
-                            self.master = master
                             m = direct_connect(master[1])
-                            self.group = m.group
+                            self.update_worker(master, m.group)
                             m.set_slave(self.worker)
-                            self.succ = m.succ
                             m.update_succ()
                         
                         elif last_group[1] > self.groups_len:
                             worker_log.debug('more workers than groups_len...')
-                            self.master = self.worker
-                            m = direct_connect(last_group[0][1])
-                            self.group = m.group
                             # TODO: clear db
+                            m = direct_connect(last_group[0][1])
                             new_slave = m.pop_slave(m.slaves[-1])
+                            self.update_worker(self.worker, m.group, new_slave)
                             s = direct_connect(new_slave[1])
-                            self.set_slave(new_slave)
                             s.change_master(self.worker, new_group, self.slaves)
                             self.register_master()
                             m.update_succ()
@@ -525,10 +514,8 @@ class Worker(BaseServer):
                         else:
                             worker_log.debug('all the groups have groups_len...')
                             self.replicate_to_masters()
-                            master = first_group[0]
-                            self.master = master
                             m = direct_connect(master[1])
-                            self.group = m.group
+                            self.update_worker(master, m.group)
                             m.set_slave(self.worker)
                             self.succ = m.succ
                             m.update_succ()
@@ -573,21 +560,19 @@ class Worker(BaseServer):
         Background thread.
         '''
         while True:
+            
             # if the worker is not the master, ping the master
             if self.master != self.worker:
                 try:
-                    # worker_log.debug('ping master...\n')
                     m = direct_connect(self.master[1])
                     m.ping()
                 except Pyro5.errors.PyroError:
                     worker_log.info('no master, regroup')
-                    # TODO: what to do when there is no master
                     self.regroup()
+            
             # if the worker is the master, try replicating
             else:
-                # worker_log.debug('replicate...\n')
                 self.replicate()
-                ...
             sleep(self._timeout)
     
     def run_threads(self):
@@ -766,11 +751,8 @@ class Worker(BaseServer):
                         # FIX: delete the database of the slave before export
                         worker_log.info(f'replicate: Copy all db to {slave[0]}...')
                         files = self.export_db(1)[0]
-                        worker_log.info('end export db...\n')
                         w.clear_db()
-                        worker_log.info('end clear...\n')
                         w.import_db(files, self.clock)
-                        worker_log.info('end import...\n')
                         worker_log.info(f'replicate: end copy to {slave[0]}\n')
             
             except Pyro5.errors.PyroError as e:
