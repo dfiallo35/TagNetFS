@@ -24,7 +24,7 @@ class Leader(BaseServer):
         self.PORT = port
 
         # self._timeout = 1
-        self._timeout = read_config()["timeout_groups"]
+        self._timeout = read_config()["global_timeout"]
 
         self.daemon = NameServerDaemon(self.IP, self.PORT)
         self.daemon_thread = Kthread(
@@ -38,11 +38,11 @@ class Leader(BaseServer):
             self.daemon.nameserver, nat=False)
 
         self.bcserver = BroadcastServer(self.nsUri, '10.0.255.255')
-        print("Broadcast server running on {}".format(self.bcserver.locationStr))
+        # print("Broadcast server running on {}".format(self.bcserver.locationStr))
         self.bcserver.runInThread()
 
-        print("NS running on {}".format(str(self.daemon.locationStr)))
-        print('URI = {}\n'.format(self.nsUri))
+        # print("NS running on {}".format(str(self.daemon.locationStr)))
+        # print('URI = {}\n'.format(self.nsUri))
         sys.stdout.flush()
 
         # PING

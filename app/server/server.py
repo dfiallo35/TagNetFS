@@ -133,7 +133,7 @@ class Server():
         self._root = Dispatcher()
         self.register('leader', self)
         self.register('request', self._root)
-        self.register('db', self._root.db)
+        # self.register('db', self._root.db)
         server_log.info('Node: {} become leader'.format(self.node_name))
 
     def become_node(self):
@@ -143,7 +143,7 @@ class Server():
         self.kill()
         self._server = Node(self.host, self.port)
         self._root = Worker(self.host, self.port, self.id, self)
-        self.register(self.node_name, self)
+        # self.register(self.node_name, self)
         self.register(self.worker_name, self._root, str(self.id))
         self._root.register_worker()
         server_log.info('Node: {} become worker\n'.format(self.node_name))
