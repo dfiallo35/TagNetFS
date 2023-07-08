@@ -112,11 +112,34 @@ class DataBase:
         '''
         Get the list of masters.
         '''
-        return [self.groups[g]['master'] for g in self.groups.keys()]
+        timeout = self.timeout
+        while True:
+            try:
+                ns = locate_ns()
+                return list(ns.list(prefix='master-').items())
+            except Pyro5.errors.NamingError:
+                sleep(timeout)
+                timeout = increse_timeout(timeout)
+        # return [self.groups[g]['master'] for g in self.groups.keys()]
     
     
     def regroup(self, group: int, worker: Tuple):
-        # If the worker alredy has a group assigned
+        masters = self.masters
+        availability = {}
+        for master in masters:
+            try:
+                m = direct_connect(master[1])
+                slaves = m.slaves
+                availability[master] = slaves
+            except Pyro5.errors.PyroError:
+                pass
+        
+        # TODO: new worker
+            # TODO: if there is a group with less workers than groups_len
+            # TODO: if there is a group with more workers than groups_len
+            # TODO: else new master
+        # TODO: already a worker
+        
         if group:
             # get workers from group
             workers_alive = self.groups[group].copy()

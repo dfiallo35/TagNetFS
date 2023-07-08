@@ -89,7 +89,7 @@ class Leader(BaseServer):
         except:
             pass
     
-    def register(self, name: str, f):
+    def register(self, name: str, f, id: str=None):
         uri = self.daemon.register(f, force=True)
         self.daemon.nameserver.register(name, uri)
 

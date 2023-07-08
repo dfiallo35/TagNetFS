@@ -67,3 +67,5 @@ def log(
 def generate_worker_uri(id: str, ip: str, port: int):
     return f'PYRO:{id}@{ip}:{port}'
 
+def get_ip_from_uri(uri: str):
+    return uri.split('@')[1].split(':')[0]
