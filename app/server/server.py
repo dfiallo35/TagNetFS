@@ -20,8 +20,9 @@ server_log = log('server', logging.INFO)
 
 # TODO: make leader the node with smaller ip
 # TODO: Differents logs
-# TODO: file for configs
+
 # TODO: change the needed try to repeat the proces n times if exception
+# TODO: n try to configs
 
 # FIX: new coordinator and functions
 
@@ -37,7 +38,6 @@ class Server():
 
         # node state
         self._alive = True
-        # self._timeout: int = 2
         self._timeout = read_config()["elections_timeout"]
         self.elections_thread: Kthread = None
         self._coordinator: Server = None
@@ -121,6 +121,12 @@ class Server():
         while True:
             ...
 
+    def register(self, name: str, f, id: str=None):
+        self._server.register(name, f, id)
+    
+    def unregister(self, name: str):
+        self._server.unregister(name)
+
     def become_leader(self):
         '''
         Become the leader.
@@ -128,9 +134,8 @@ class Server():
         self.kill()
         self._server = Leader(self.host, self.port)
         self._root = Dispatcher()
-        self._server.register('leader', self)
-        self._server.register('request', self._root)
-        self._server.register('db', self._root.db)
+        self.register('leader', self)
+        self.register('request', self._root)
         server_log.info('Node: {} become leader'.format(self.node_name))
 
     def become_node(self):
@@ -139,9 +144,7 @@ class Server():
         '''
         self.kill()
         self._server = Node(self.host, self.port)
-        self._root = Worker(self.host, self.port, self.id)
-        self._server.register(self.worker_name, self._root, str(self.id))
-        self._root.register_worker()
+        self._root = Worker(self.host, self.port, self.id, self)
         server_log.info('Node: {} become worker\n'.format(self.node_name))
 
     ########### ELECTIONS ###########
@@ -181,7 +184,7 @@ class Server():
                     ns = locate_ns()
                     coordinator = connect(ns, 'leader')
                     return coordinator
-                except Pyro5.errors.NamingError:
+                except Pyro5.errors.PyroError:
                     return self
             
             # if the coordinator is alive
@@ -192,7 +195,7 @@ class Server():
                     if ns and ns._pyroUri.host != self.coordinator.host:
                         coordinator = connect(ns, 'leader')
                         return coordinator
-                except Pyro5.errors.NamingError:
+                except Pyro5.errors.PyroError:
                     return self._coordinator
 
         except Pyro5.errors.PyroError:
@@ -202,7 +205,7 @@ class Server():
                 coordinator = connect(ns, 'leader')
                 return coordinator
             
-            except Pyro5.errors.NamingError:
+            except Pyro5.errors.PyroError:
                 # there is no coordinator
                 return self
 
