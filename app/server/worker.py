@@ -216,17 +216,13 @@ class Worker(BaseServer):
         '''
         Register master in NS.
         '''
-        worker_log.debug('register master...')
         self.server.register(self.master_name, self)
-        worker_log.debug('end register master...')
 
     def unregister_master(self):
         '''
         Unregister master from NS.
         '''
-        worker_log.debug('unregister master...')
         self.server.unregister(self.master_name)
-        worker_log.debug('end unregister master...')
     
 
     # SUCCESSION
@@ -346,7 +342,7 @@ class Worker(BaseServer):
         
         # set new group number
         new_group = 1
-        for i, g in enumerate(sorted([v for v in master_group.values()])):
+        for i, g in enumerate(sorted(list(master_group.values()))):
             i+=1
             if i != g:
                 new_group = i
@@ -395,7 +391,7 @@ class Worker(BaseServer):
                             # TODO: clear db
                             m = direct_connect(last_group[0][1])
                             new_slave = m.pop_slave(m.slaves[-1])
-                            self.update_worker(self.worker, m.group, new_slave)
+                            self.update_worker(self.worker, new_group, new_slave)
                             s = direct_connect(new_slave[1])
                             s.change_master(self.worker, new_group, self.slaves)
                             self.register_master()
@@ -458,7 +454,7 @@ class Worker(BaseServer):
                         worker_log.debug('more workers than groups_len...')
                         m = direct_connect(last_group[0][1])
                         new_slave = m.pop_slave(m.slaves[-1])
-                        self.update_worker(self.worker, m.group, new_slave)
+                        self.update_worker(self.worker, new_group, new_slave)
                         # TODO: clear db
                         s = direct_connect(new_slave[1])
                         s.change_master(self.worker, new_group, self.slaves)
@@ -506,7 +502,7 @@ class Worker(BaseServer):
                             # TODO: clear db
                             m = direct_connect(last_group[0][1])
                             new_slave = m.pop_slave(m.slaves[-1])
-                            self.update_worker(self.worker, m.group, new_slave)
+                            self.update_worker(self.worker, new_group, new_slave)
                             s = direct_connect(new_slave[1])
                             s.change_master(self.worker, new_group, self.slaves)
                             self.register_master()
