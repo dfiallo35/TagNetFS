@@ -364,6 +364,7 @@ class Worker(BaseServer):
         if slave:
             self.set_slave(slave)
 
+    # BUG: group number
     def run_worker(self):
         '''
         Register the worker to the name server and the database.
