@@ -216,20 +216,17 @@ class Worker(BaseServer):
         '''
         Register master in NS.
         '''
-        done = False
-        while not done:
-            try:
-                self.server.register(self.master_name, self)
-                done = True
-            except:
-                pass
-    
+        worker_log.debug('register master...')
+        self.server.register(self.master_name, self)
+        worker_log.debug('end register master...')
+
     def unregister_master(self):
         '''
         Unregister master from NS.
         '''
-        # TODO: unregister master
-        ...
+        worker_log.debug('unregister master...')
+        self.server.unregister(self.master_name)
+        worker_log.debug('end unregister master...')
     
 
     # SUCCESSION
@@ -433,13 +430,13 @@ class Worker(BaseServer):
         '''
         Regroup the worker to a group.
         '''
-        worker_log.info('regroup...\n')
+        worker_log.info('regroup...')
         new_group, master_len = self.data_from_masters()
         
         # if master
         if self.master == self.worker:
             if not self.slaves:
-                master_len = sorted([_m for _m in master_len if _m[0][0] != self.master_name], key=lambda x: x[1])
+                master_len = sorted([_m for _m in master_len if _m[0][0] != self.worker_name], key=lambda x: x[1])
 
                 if master_len:
                     # TODO: generate groups if more workers than groups_len
@@ -452,6 +449,7 @@ class Worker(BaseServer):
                         self.replicate_to_masters()
                         m = direct_connect(master[1])
                         self.update_worker(master, m.group)
+                        self.unregister_master()
                         m.set_slave(self.worker)
                         m.update_succ()
                     
@@ -463,6 +461,7 @@ class Worker(BaseServer):
                         # TODO: clear db
                         s = direct_connect(new_slave[1])
                         s.change_master(self.worker, new_group, self.slaves)
+                        self.unregister_master()
                         self.register_master()
                         m.update_succ()
                     
@@ -471,6 +470,7 @@ class Worker(BaseServer):
                         self.replicate_to_masters()
                         m = direct_connect(master[1])
                         self.update_worker(master, m.group)
+                        self.unregister_master()
                         m.set_slave(self.worker)
                         m.update_succ()
 
@@ -524,12 +524,15 @@ class Worker(BaseServer):
                     else:
                         worker_log.debug('not exist masters...')
                         self.master = self.worker
+                        self.register_master()
                         self.succ = []
                 
+                # FIX: for successors
                 # if worker is the successor
                 elif self.worker == succ:
                     worker_log.debug('worker is succ...')
                     self.master = self.worker
+                    self.register_master()
                     self.succ = []
                 
                 # if there is a successor but not this worker
@@ -549,6 +552,7 @@ class Worker(BaseServer):
             else:
                 worker_log.debug('there is not succ')
                 self.master = self.worker
+                self.register_master()
                 self.succ = []
         
         self.general_status
@@ -755,10 +759,9 @@ class Worker(BaseServer):
                         w.import_db(files, self.clock)
                         worker_log.info(f'replicate: end copy to {slave[0]}\n')
             
-            except Pyro5.errors.PyroError as e:
+            except Pyro5.errors.PyroError:
                 # if the slave is not reachable
                 worker_log.info(f'replicate: slave: {slave[0]} disconected')
-                print(e)
                 self.pop_slave(slave)
                 self.update_succ()
                 self.regroup()

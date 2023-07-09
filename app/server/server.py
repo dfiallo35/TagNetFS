@@ -122,7 +122,11 @@ class Server():
             ...
 
     def register(self, name: str, f, id: str=None):
+        print(f'register {name}...')
         self._server.register(name, f, id)
+    
+    def unregister(self, name: str):
+        self._server.unregister(name)
 
     def become_leader(self):
         '''

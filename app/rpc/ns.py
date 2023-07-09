@@ -90,22 +90,20 @@ class Leader(BaseServer):
             pass
     
     def register(self, name: str, f, id: str=None):
-        registred = False
-        while not registred:
+        for _ in range(3):
             try:
                 uri = self.daemon.register(f, force=True)
                 self.daemon.nameserver.register(name, uri)
-                registred = True
+                break
             except Pyro5.errors.PyroError:
                 sleep(self._timeout)
     
     def unregister(self, name: str):
-        deleted = False
-        while not deleted:
+        for _ in range(3):
             try:
                 ns = self.daemon.nameserver
                 ns.remove(name)
-                deleted = True
+                break
             except Pyro5.errors.PyroError:
                 sleep(self._timeout)
 
@@ -145,7 +143,7 @@ class Node(BaseServer):
         print("Node running on {}".format(str(self.daemon.locationStr)))
 
         # TODO: what to do with ns
-        self.ns: Proxy = locate_ns()
+        self.ns = locate_ns()
         print('Node connected to {}\n'.format(self.ns._pyroUri.host))
 
     def ping(self):
@@ -175,11 +173,25 @@ class Node(BaseServer):
         except:
             pass
     
-    # FIX: update ns?
+    # FIX: not exist
     def register(self, name: str, f, id: str=None):
-        uri = self.daemon.register(f, force=True, objectId=id)
-        self.ns.register(name, uri)
-        return uri
+        for _ in range(3):
+            try:
+                uri = self.daemon.register(f, force=True, objectId=id)
+                ns = locate_ns()
+                ns.register(name, uri)
+                break
+            except Pyro5.errors.PyroError:
+                sleep(self._timeout)
+    
+    def unregister(self, name: str):
+        for _ in range(3):
+            try:
+                ns = locate_ns()
+                ns.remove(name)
+                break
+            except Pyro5.errors.PyroError:
+                sleep(self._timeout)
 
 
 def locate_ns() -> Proxy:
