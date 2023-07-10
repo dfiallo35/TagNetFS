@@ -4,6 +4,10 @@ from io import BytesIO
 
 from app.utils.utils import decode
 
+
+
+#TODO create a garbage collector for when a file has 0 tags, eliminate it from the database
+
 def dirs_to_UploadFile(file_list: list[tuple]):
     return [UploadFile(file=f, filename=n) for f, n in file_list]
 

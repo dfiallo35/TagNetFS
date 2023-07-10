@@ -1,0 +1,9 @@
+python3 client.py delete -q DAA
+python3 client.py delete-tags -t music -q something
+python3 client.py  list -q something
+python3 client.py delete -q something 
+python3 client.py  list -q something
+python3 client.py add -f ./example_database/n.py -f ./example_database/t.md -f ./example_database/a.txt  -t something
+python3 client.py add -f ./example_database/rasterio.png -f ./example_database/resumen.md -t ML
+
+
