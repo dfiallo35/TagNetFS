@@ -45,6 +45,12 @@ Se utiliza una arquitectura de sistema distribuido cliente-servidor, se tiene un
 
 ### Comunicación:
 
+La comunicación entre servidores se realiza mediante RPC (Remote Procedure Call), utilizando las funciones que son visibles gracias a Pyro Expose.
+
+Cuando el cliente realiza una solicitud al sistema, el dispatcher la recibe, le asigna un id y la envía a uno de los workers para su procesamiento. El worker recibe y procesa esta petición. Los workers si tienen más de una petición que procesar a la vez, las encolan y las van ejecutando por orden de llegada.
+
+Para determinar si la respuesta está lista, el dispatcher le pregunta al worker si ha finalizado la ejecución del procedimiento, utilizando el id del mismo para reconocerlo. Si la respuesta es negativa continúa esperando y repite la pregunta después de cierto tiempo. Si la respuesta es afirmativa, el servidor invoca al cliente a través del proxy y le proporciona los resultados.
+
 
 
 ### Nombrado y Localización:
