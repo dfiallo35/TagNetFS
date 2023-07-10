@@ -71,3 +71,17 @@ Cuando llega una solicitud al sistema, el servidor líder la recibe y la envía 
 La sincronización en nuestro caso ocurre fundamentalmente a nivel de grupo, cada master y cada slave tiene un reloj lógico, donde el objetivo es que estén sincronizados, en caso de un request al master, este luego de cumplirlo aumenta su reloj lógico en 1 y manda a actualizar los relojes de sus slaves, enviando la lista de requests que él acaba de cumplir tal que sean las últimas $k$ instrucciones siendo k la diferencia de sus relojes, si estas instrucciones no se encuentran o no se pueden enviar al slave por alguna otra razón se manda a este a copiar todo el fragmento de base de datos de su master, así se asegura la consistencia en todo momento de cada copia de los datos.
 
 ### Tolerancia a fallas:
+
+La implementación realizada partiendo del name-server de python garantiza que en todo momento cualquier nodo del sistema pueda acceder al resto de los nodos, no existiendo posibilidad de desconexión de la red en fragmentos.
+
+
+Si un nodo se desconecta de la red, falla o se vuelve inaccesible ocurre alguno de los siguientes casos:
+
+- el nodo era el dispatcher del sistema:
+El dispatcher tiene una línea de sucesión en la cuál todos los masters del sistema conocen la lista de la línea de succesión hasta ellos, siendo estos el último elemento de su lista. En caso de desconección del dispatcher se pierde el name-server que este tenía
+
+- el nodo era un worker y un master de grupo:
+
+- el nodo era un worker y un slave de un grupo:
+
+
