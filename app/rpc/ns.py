@@ -14,6 +14,7 @@ from Pyro5.nameserver import NameServerDaemon, BroadcastServer
 from app.utils.thread import Kthread
 from app.utils.constant import *
 from app.server.base_server import BaseServer
+from app.utils.utils import read_config
 
 
 class Leader(BaseServer):
@@ -22,7 +23,7 @@ class Leader(BaseServer):
         self.IP = ip
         self.PORT = port
 
-        self._timeout = 1
+        self._timeout = read_config()["global_timeout"]
 
         self.daemon = NameServerDaemon(self.IP, self.PORT)
         self.daemon_thread = Kthread(
@@ -36,11 +37,10 @@ class Leader(BaseServer):
             self.daemon.nameserver, nat=False)
 
         self.bcserver = BroadcastServer(self.nsUri, '10.0.255.255')
-        print("Broadcast server running on {}".format(self.bcserver.locationStr))
+        # print("Broadcast server running on {}".format(self.bcserver.locationStr))
         self.bcserver.runInThread()
 
         print("NS running on {}".format(str(self.daemon.locationStr)))
-        print('URI = {}\n'.format(self.nsUri))
         sys.stdout.flush()
 
         # PING
@@ -87,9 +87,23 @@ class Leader(BaseServer):
         except:
             pass
     
-    def register(self, name: str, f):
-        uri = self.daemon.register(f, force=True)
-        self.daemon.nameserver.register(name, uri)
+    def register(self, name: str, f, id: str=None):
+        for _ in range(3):
+            try:
+                uri = self.daemon.register(f, force=True)
+                self.daemon.nameserver.register(name, uri)
+                break
+            except Pyro5.errors.PyroError:
+                sleep(self._timeout)
+    
+    def unregister(self, name: str):
+        for _ in range(3):
+            try:
+                ns = self.daemon.nameserver
+                ns.remove(name)
+                break
+            except Pyro5.errors.PyroError:
+                sleep(self._timeout)
 
     def ping_alive(self):
         '''
@@ -97,7 +111,7 @@ class Leader(BaseServer):
         '''
         while True:
             try:
-                ns = locate_ns()
+                ns = self.daemon.nameserver
                 objects = list(ns.list().items())
                 for name, uri in objects:
                     try:
@@ -127,7 +141,7 @@ class Node(BaseServer):
         print("Node running on {}".format(str(self.daemon.locationStr)))
 
         # TODO: what to do with ns
-        self.ns: Proxy = locate_ns()
+        self.ns = locate_ns()
         print('Node connected to {}\n'.format(self.ns._pyroUri.host))
 
     def ping(self):
@@ -157,11 +171,25 @@ class Node(BaseServer):
         except:
             pass
     
-    # FIX: update ns?
+    # FIX: not exist
     def register(self, name: str, f, id: str=None):
-        uri = self.daemon.register(f, force=True, objectId=id)
-        self.ns.register(name, uri)
-        return uri
+        for _ in range(3):
+            try:
+                uri = self.daemon.register(f, force=True, objectId=id)
+                ns = locate_ns()
+                ns.register(name, uri)
+                break
+            except Pyro5.errors.PyroError:
+                sleep(self._timeout)
+    
+    def unregister(self, name: str):
+        for _ in range(3):
+            try:
+                ns = locate_ns()
+                ns.remove(name)
+                break
+            except Pyro5.errors.PyroError:
+                sleep(self._timeout)
 
 
 def locate_ns() -> Proxy:

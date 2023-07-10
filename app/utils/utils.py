@@ -7,15 +7,21 @@ from time import sleep
 from math import ceil, floor
 from typing import List, Dict
 from fastapi import UploadFile
+import json
 
 
-CONFIG_PATH = 'config.yml'
+CONFIG_PATH = 'configs.json'
 
 def encode(data: bytes):
     return base64.b64encode(data)
 
 def decode(data: bytes):
     return base64.b64decode(data)
+
+def read_config(filepath = CONFIG_PATH):
+    with open(filepath, 'r') as file:
+        json_data = json.load(file)
+    return json_data
 
 def hash(bits: int, host: str):
     return int(hashlib.sha256(host.encode('utf-8', 'ignore')).hexdigest(), 16) % (2 ** bits)
@@ -61,14 +67,5 @@ def log(
 def generate_worker_uri(id: str, ip: str, port: int):
     return f'PYRO:{id}@{ip}:{port}'
 
-# def get_configs():
-#     with open(CONFIG_PATH, 'r') as file:
-#         config = yaml.load(file, Loader=yaml.FullLoader)
-#     return config
-
-
-# def set_configs(data: Dict):
-#     with open(CONFIG_PATH, 'w') as file:
-#         yaml.dump(data, file)
-
-
+def get_ip_from_uri(uri: str):
+    return uri.split('@')[1].split(':')[0]

@@ -159,11 +159,13 @@ def save_files(db: Session, files: List[Tuple[UploadFile, str]]):
     for file, tags in files:
         _add(db, [FileCreate(file=tools.dir_to_UploadFile((file[0], file[1])), name=file[1])], [TagCreate(name=t) for t in tags])
     
-
+# FIX
 def clear_db(db: Session):
     query = db.query(models.File)
     if list(query):
-        query.delete()
+        for i in list(query):
+            db.delete(i)
+        db.commit()
     if os.path.exists('files'):
         shutil.rmtree('files')
 
