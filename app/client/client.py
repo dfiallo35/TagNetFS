@@ -15,6 +15,6 @@ class Client:
             responce = f.request(request)
             print(responce)
             
-        except Pyro5.errors.NamingError:
-            print('NOT CONECTED...')
+        except:
+            print('LOST CONNECTION...')
 
