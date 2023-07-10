@@ -63,7 +63,8 @@ class Worker(BaseServer):
         self.lock_succ = Lock()
 
         # register
-        self.server.register(self.worker_name, self, str(self.id))
+        self.ns_host = None
+        self.register()
         self.run_worker()
 
 
@@ -224,6 +225,32 @@ class Worker(BaseServer):
         '''
         self.server.unregister(self.master_name)
     
+    def register(self):
+        if self.master == self.worker:
+            self.register_master()
+        self.server.register(self.worker_name, self, str(self.id))
+        self.ns_host = locate_ns()._pyroUri.host
+    
+    def ping_master(self, ):
+        while True:
+            try:
+                ns = locate_ns()
+                if self.ns_host != ns._pyroUri.host:
+                    pass
+                else:
+                    for _ in range(3):
+                        try:
+                            m = direct_connect(self.master[1])
+                            m.ping()
+                            return True
+                        except Pyro5.errors.PyroError:
+                            pass
+                    return False
+            except Pyro5.errors.NamingError:
+                pass
+            sleep(self.timeout)
+        
+    
 
     # SUCCESSION
     @property
@@ -360,7 +387,6 @@ class Worker(BaseServer):
         if slave:
             self.set_slave(slave)
 
-    # BUG: group number
     def run_worker(self):
         '''
         Register the worker to the name server and the database.
@@ -564,10 +590,7 @@ class Worker(BaseServer):
             
             # if the worker is not the master, ping the master
             if self.master != self.worker:
-                try:
-                    m = direct_connect(self.master[1])
-                    m.ping()
-                except Pyro5.errors.PyroError:
+                if not self.ping_master():
                     worker_log.info('no master, regroup')
                     self.regroup()
             
