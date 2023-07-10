@@ -1,0 +1,7 @@
+dispatcher: {}
+global:
+  group size: 3
+  retries: 3
+  timeout: 0.1
+server: {}
+workers: {}

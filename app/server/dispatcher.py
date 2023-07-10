@@ -24,9 +24,12 @@ class Dispatcher(BaseServer):
     def __init__(self):
         # db state
         self._job_id = 0
-        self._timeout = read_config()["global_timeout"]
         self._requests: Dict[int, Tuple] = {}
         self.results: Dict[int, List[dict]] = {}
+
+        # configs
+        configs = read_configs()['global']
+        self._timeout = configs['timeout']
 
         # locks
         self.lock_id = Lock()

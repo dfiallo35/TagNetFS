@@ -38,12 +38,15 @@ class Worker(BaseServer):
         self._worker_name = f'worker-{id}'
         self._master_name = f'master-{id}'
 
+        # configs
+        configs = read_configs()['global']
+
         # database
         self.database = DatabaseSession()
         self._requests = {}
         self.results: Dict[int, dict] = {}
-        self._timeout=read_config()["global_timeout"]
-        self.groups_len = read_config()["groups_len"]
+        self._timeout= configs['timeout']
+        self.groups_len = configs['group size']
         self._job_id = 0
         self._succ = []
 
@@ -189,7 +192,7 @@ class Worker(BaseServer):
         '''
         Get the list of masters.
         '''
-        timeout = self._timeout
+        timeout = self.timeout
         while True:
             try:
                 ns = locate_ns()
@@ -436,7 +439,7 @@ class Worker(BaseServer):
                 self.run_threads()
                 self.general_status
             except Pyro5.errors.PyroError:
-                sleep(self._timeout)
+                sleep(self.timeout)
     
     
     def regroup(self):
@@ -583,7 +586,7 @@ class Worker(BaseServer):
             # if the worker is the master, try replicating
             else:
                 self.replicate()
-            sleep(self._timeout)
+            sleep(self.timeout)
     
     def run_threads(self):
         '''
@@ -743,13 +746,13 @@ class Worker(BaseServer):
                             w.run(self.requests[next_clock], next_clock)
 
                             # Wait responce
-                            timeout = self._timeout
+                            timeout = self.timeout
                             while True:
                                 r = w.get_result(next_clock)
                                 if r is not None:
                                     break
                                 else:
-                                    sleep(self._timeout)
+                                    sleep(self.timeout)
                                     timeout = increse_timeout(timeout)
                         
                         # just update for requests that don't modify the db, LIST request

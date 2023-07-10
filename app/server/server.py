@@ -33,9 +33,12 @@ class Server():
         self._nbits = nbits
         server_log.info('Node name: {}'.format(self.node_name))
 
+        # configs
+        configs = read_configs()['global']
+        
         # node state
         self._alive = True
-        self._timeout = read_config()["global_timeout"]
+        self._timeout = configs['timeout']
         self.elections_thread: Kthread = None
         self._coordinator: Server = None
         
