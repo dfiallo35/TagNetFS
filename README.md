@@ -10,10 +10,6 @@ Now that you have the image you can change the project settings in the `configs.
 
 
 
-### Requisitos del sistema:
-
-
-
 ### Descripción del sistema.
 
 TagFS o Tag based file system es un sistema de ficheros distribuido basado en etiquetas cuyo objetivo es el almacenamiento y consulta de ficheros a través de sus etiquetas asignadas.
@@ -72,7 +68,6 @@ Para la replicación de los datos, se utiliza una base de datos distribuida que 
 
 Cuando llega una solicitud al sistema, el servidor líder la recibe y la envía a uno de los masters del grupo correspondiente para su procesamiento. El master se encarga de actualizar su copia del fragmento de la base de datos y enviar los cambios a sus slaves, que son nodos encargados de almacenar copias de la base de datos para garantizar la disponibilidad y tolerancia a fallos. De esta manera, si el master falla, uno de los slaves puede asumir su papel y continuar procesando las solicitudes.
 
-La sincronización en nuestro caso ocurre fundamentalmente a nivel de grupo
-
+La sincronización en nuestro caso ocurre fundamentalmente a nivel de grupo, cada master y cada slave tiene un reloj lógico, donde el objetivo es que estén sincronizados, en caso de un request al master, este luego de cumplirlo aumenta su reloj lógico en 1 y manda a actualizar los relojes de sus slaves, enviando la lista de requests que él acaba de cumplir tal que sean las últimas $k$ instrucciones siendo k la diferencia de sus relojes, si estas instrucciones no se encuentran o no se pueden enviar al slave por alguna otra razón se manda a este a copiar todo el fragmento de base de datos de su master, así se asegura la consistencia en todo momento de cada copia de los datos.
 
 ### Tolerancia a fallas:
