@@ -53,11 +53,11 @@ Se utiliza una arquitectura de sistema distribuido cliente-servidor, donde se ti
 
 Mientras, los workers trabajan con una base de datos distribuida basada en una arquitectura Master-Slave, donde se dividen en grupos de tamaño $n$ configurable. En cada grupo se tiene un master y $n-1$ slaves, donde el master es el encargado de almacenar el fragmento de la base de datos distribuida y de responder las peticiones o hacer cambios en la base de datos según las peticiones recibidas. Los slaves son nodos encargados de almacenar copias de la base de datos para garantizar la disponibilidad y tolerancia a fallos. De esta manera, si el master falla, uno de los slaves puede asumir su papel y continuar procesando las solicitudes.
 
-<div style="text-align:center;">
-  <img width='400' heigth='200' src=imgs/1.jpg alt="Arquitectura del Sistema">
+<p align="center">
+  <img width=370px src="imgs/1.jpg">
   <br>
-  <span style="font-size:16px;">Arquitectura del Sistema</span>
-</div>
+  Arquitectura del Sistema
+</p>
 
  
 
