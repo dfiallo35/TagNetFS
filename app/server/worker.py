@@ -19,9 +19,8 @@ from app.server.base_server import BaseServer
 worker_log = log('worker', logging.DEBUG)
 
 
-# FIX: different id than db class
+# FIX: Missing data. TEST
 
-# TODO: si se cambia el clock pero no se ha copiado la db que pasa en la replicacion
 # TODO: rollback if brake connection or separated commit?
 # TODO: what happend with incomplete data?
 
@@ -87,7 +86,6 @@ class Worker(BaseServer):
         status = {
             'clock': self.clock,
             'group': self.group,
-            'master': self.master[0],
             'succ': [s[0] for s in self.succ],
             'slaves': slaves_status,
         }
@@ -97,9 +95,6 @@ class Worker(BaseServer):
     def slave_status(self):
         status = {
             'clock': self.clock,
-            'group': self.group,
-            'master': self.master[0],
-            'slaves': [s[0] for s in self.slaves],
             'succ': [s[0] for s in self.succ],
         }
         return status
@@ -244,7 +239,7 @@ class Worker(BaseServer):
                             m.ping()
                             return True
                         except Pyro5.errors.PyroError:
-                            pass
+                            sleep(self.timeout)
                     return False
             except Pyro5.errors.NamingError:
                 pass
@@ -279,8 +274,7 @@ class Worker(BaseServer):
                 s.succ = slaves
             except Pyro5.errors.PyroError:
                 pass
-    
-    # FIX
+
     def change_master(self, new_master: Tuple, group: int, succ: List[Tuple]):
         if self.master != new_master:
             self.kill_threads()
@@ -395,6 +389,7 @@ class Worker(BaseServer):
             try:
                 worker_log.info('register node...')
                 new_group, master_len = self.data_from_masters()
+                self.clear_db()
 
                 # if worker has no group
                 if not self.group:
@@ -437,18 +432,13 @@ class Worker(BaseServer):
                         worker_log.debug('no groups...')
                         self.update_worker(self.worker, new_group)
                         self.register_master()
-
-                self.clear_db()
+                
                 self.run_threads()
                 self.general_status
             except Pyro5.errors.PyroError:
                 sleep(self._timeout)
     
     
-    # TODO: kill and recreate threads?
-    # TODO: clear slaves, succ, db
-    # TODO: replicate db
-    # TODO: unregister master from ns
     def regroup(self):
         '''
         Regroup the worker to a group.
@@ -462,7 +452,6 @@ class Worker(BaseServer):
                 master_len = sorted([_m for _m in master_len if _m[0][0] != self.worker_name], key=lambda x: x[1])
 
                 if master_len:
-                    # TODO: generate groups if more workers than groups_len
                     first_group = master_len[0]
                     last_group = master_len[-1]
                     master = first_group[0]
@@ -481,7 +470,6 @@ class Worker(BaseServer):
                         m = direct_connect(last_group[0][1])
                         new_slave = m.pop_slave(m.slaves[-1])
                         self.update_worker(self.worker, new_group, new_slave)
-                        # TODO: clear db
                         s = direct_connect(new_slave[1])
                         s.change_master(self.worker, new_group, self.slaves)
                         self.unregister_master()
@@ -509,7 +497,6 @@ class Worker(BaseServer):
                     
                     # exist masters
                     if master_len:
-                        # TODO: generate groups if more workers than groups_len
                         worker_log.debug('exist masters...')
                         first_group = master_len[0]
                         last_group = master_len[-1]
@@ -525,7 +512,6 @@ class Worker(BaseServer):
                         
                         elif last_group[1] > self.groups_len:
                             worker_log.debug('more workers than groups_len...')
-                            # TODO: clear db
                             m = direct_connect(last_group[0][1])
                             new_slave = m.pop_slave(m.slaves[-1])
                             self.update_worker(self.worker, new_group, new_slave)

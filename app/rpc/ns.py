@@ -23,7 +23,6 @@ class Leader(BaseServer):
         self.IP = ip
         self.PORT = port
 
-        # self._timeout = 1
         self._timeout = read_config()["global_timeout"]
 
         self.daemon = NameServerDaemon(self.IP, self.PORT)
@@ -42,7 +41,6 @@ class Leader(BaseServer):
         self.bcserver.runInThread()
 
         print("NS running on {}".format(str(self.daemon.locationStr)))
-        # print('URI = {}\n'.format(self.nsUri))
         sys.stdout.flush()
 
         # PING

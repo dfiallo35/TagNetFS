@@ -1,8 +1,10 @@
 import random
-import Pyro5.api
 from time import sleep
 from multiprocessing import Lock
 from typing import Tuple, List, Dict
+
+import Pyro5.api
+import Pyro5.errors
 
 from app.rpc.ns import *
 from app.utils.utils import *
@@ -22,7 +24,6 @@ class Dispatcher(BaseServer):
     def __init__(self):
         # db state
         self._job_id = 0
-        self.worker_prefix = 'worker-'
         self._timeout = read_config()["global_timeout"]
         self._requests: Dict[int, Tuple] = {}
         self.results: Dict[int, List[dict]] = {}
