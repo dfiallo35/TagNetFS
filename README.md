@@ -1,9 +1,14 @@
 # Tag Based File System
 
+##### - Dennis Fiallo Muñoz C-411
+##### - Lauren Olivia Guerra Hernández C-412
+
 #### How to run
 
 If you don't have the `tagfs.tar` file, you must first create the project image using the docker command `docker build tagfs <project address>`, but if you already have the image you just have to do `docker load -i <image address>`.
 Now that you have the image you can change the project settings in the `configs.json` file and how you want to build the nodes in `docker-compose.yml`. Then run the `docker compose up ...` command to activate the nodes.
+
+
 
 ### Requisitos del sistema:
 
@@ -56,15 +61,18 @@ Para determinar si la respuesta está lista, el dispatcher le pregunta al worker
 
 ### Nombrado y Localización:
 
-
-### Sincronización:
+Para tener ubicados a todos los servidores de la red se utiliza el name-server de Pyro5, lo cual permite al nodo líder buscar y conectarse con objetos Pyro de forma dinámica y transparente. Todos los nodos se encuentran ubicados en el name-server de la forma (nombre, URI) para así a través del nombre del nodo obtener su URI y poder conectarse a él. El nodo encargado de tener el name-server es el nodo líder del sistema, el que además tiene la funcionalidad de dispatcher, teniendo acceso a otras informaciones esenciales para su funcionamiento como son quienes son los master de cada grupo (a continuación se explicará que son los masters y slaves de cada grupo y que son los grupos).
+<!-- 
+En nuestro caso a excepción de la petición add que agrega un archivo al sistema y es enviado a un solo worker para ser guardado con sus correspondientes tags, todas las peticiones llaman a todos los -->
 
 
 ### Consistencia y Replicación:
 
-Para la replicación de los datos, se utiliza una base de datos distribuida que se reparte entre varios nodos, cada uno de los cuales es el master de un grupo. Cada grupo contiene un fragmento de la base de datos, y todos los masters en el grupo tienen una copia completa del fragmento correspondiente.
+Para la replicación de los datos, se utiliza una base de datos distribuida que se reparte entre varios nodos, cada uno de los cuales es el master de un grupo. Cada grupo contiene un fragmento de la base de datos, y todos los masters en el grupo tienen una copia completa del fragmento correspondiente. Cada grupo está constituído por un nodo master y varios slaves según la configuración del sistema de cuántos server deben haber por grupo.
 
 Cuando llega una solicitud al sistema, el servidor líder la recibe y la envía a uno de los masters del grupo correspondiente para su procesamiento. El master se encarga de actualizar su copia del fragmento de la base de datos y enviar los cambios a sus slaves, que son nodos encargados de almacenar copias de la base de datos para garantizar la disponibilidad y tolerancia a fallos. De esta manera, si el master falla, uno de los slaves puede asumir su papel y continuar procesando las solicitudes.
+
+La sincronización en nuestro caso ocurre fundamentalmente a nivel de grupo
 
 
 ### Tolerancia a fallas:
