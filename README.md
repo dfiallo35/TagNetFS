@@ -1,9 +1,10 @@
 # Tag Based File System
 
-##### - Dennis Fiallo Muñoz C-411
-##### - Lauren Olivia Guerra Hernández C-412
+#### Team:
+- Dennis Fiallo Muñoz C-411
+- Lauren Olivia Guerra Hernández C-412
 
-#### How to run
+### How to run
 
 If you don't have the `tagfs.tar` file, you must first create the project image using the docker command `docker build tagfs <project address>`, but if you already have the image you just have to do `docker load -i <image address>`.
 Now that you have the image you can change the project settings in the `configs.json` file and how you want to build the nodes in `docker-compose.yml`. Then run the `docker compose up ...` command to activate the nodes.
@@ -42,12 +43,20 @@ La interfaz del sistema es la consola de comandos, se puede llamar al cliente a 
 
 ### Arquitectura del sistema:
 
-Se utiliza una arquitectura de sistema distribuido cliente-servidor, se tiene un servidor que actúa como líder y tiene la funcionalidad de dispatcher, es decir, recibe las request del cliente y las reparte entre los diferentes nodos que actúan como workers, estos son los nodos encargados de almacenar fragmentos de la base de datos distribuida y de responder las peticiones o hacer cambios e la base de datos según las peticiones recibidas.
+Se utiliza una arquitectura de sistema distribuido cliente-servidor, donde se tiene:
+- Cliente: Parte que se encarga de enviar las solicitudes al sistema y recibir las respuestas.
+- Servidor: Parte que se encarga de almacenar los datos y procesar las solicitudes recibidas. Este se divide en:
+  - Lider: Este va a hacer función de name-server usando un `NameServerDaemon` proporcionado por Pyro5. En este se van a registrar los nodos pertenecientes a la red. En caso de perder a este nodo, otro nodo de la red ocupa su lugar como lider. Este va a contar con la funcionalidad de:
+    - Dispatcher: Se encarga de recibir las solicitudes del cliente y repartirlas entre los workers.
+  - Nodo: Este va a registrar en un Daemon sus funcionalidad de:
+    - Worker: Parte que se encarga de almacenar los datos y procesar las solicitudes recibidas.
+
+Mientras, los workers trabajan con una base de datos distribuida basada en una arquitectura Master-Slave, donde se dividen en grupos de tamaño $n$ configurable. En cada grupo se tiene un master y $n-1$ slaves, donde el master es el encargado de almacenar el fragmento de la base de datos distribuida y de responder las peticiones o hacer cambios en la base de datos según las peticiones recibidas. Los slaves son nodos encargados de almacenar copias de la base de datos para garantizar la disponibilidad y tolerancia a fallos. De esta manera, si el master falla, uno de los slaves puede asumir su papel y continuar procesando las solicitudes.
  
 
 ### Comunicación:
 
-La comunicación entre servidores se realiza mediante RPC (Remote Procedure Call), utilizando las funciones que son visibles gracias a Pyro Expose.
+La comunicación entre servidores se realiza mediante RPC (Remote Procedure Call), utilizando un proxy para la invocación remota de procedimientos.
 
 Cuando el cliente realiza una solicitud al sistema, el dispatcher la recibe, le asigna un id y la envía a uno de los workers para su procesamiento. El worker recibe y procesa esta petición. Los workers si tienen más de una petición que procesar a la vez, las encolan y las van ejecutando por orden de llegada.
 
