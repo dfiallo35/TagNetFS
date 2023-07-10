@@ -2,7 +2,8 @@
 
 #### How to run
 
-To run the code, you must first install the python dependencies found in requirements.txt with `pip install -r requirements.txt`.
+If you don't have the `tagfs.tar` file, you must first create the project image using the docker command `docker build tagfs <project address>`, but if you already have the image you just have to do `docker load -i <image address>`.
+Now that you have the image you can change the project settings in the `configs.json` file and how you want to build the nodes in `docker-compose.yml`. Then run the `docker compose up ...` command to activate the nodes.
 
 ### Requisitos del sistema:
 
