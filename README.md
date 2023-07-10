@@ -45,11 +45,11 @@ La interfaz del sistema es la consola de comandos, se puede llamar al cliente a 
 
 Se utiliza una arquitectura de sistema distribuido cliente-servidor, donde se tiene:
 - Cliente: Parte que se encarga de enviar las solicitudes al sistema y recibir las respuestas.
-- Nodo: Parte que se encarga de almacenar los datos y procesar las solicitudes recibidas.
-
-Este último se divide en:
-- Dispatcher: Parte que se encarga de recibir las solicitudes del cliente y repartirlas entre los workers.
-- Worker: Parte que se encarga de almacenar los datos y procesar las solicitudes recibidas.
+- Servidor: Parte que se encarga de almacenar los datos y procesar las solicitudes recibidas. Este se divide en:
+  - Lider: Este va a hacer función de name-server usando un `NameServerDaemon` proporcionado por Pyro5. En este se van a registrar los nodos pertenecientes a la red. En caso de perder a este nodo, otro nodo de la red ocupa su lugar como lider. Este va a contar con la funcionalidad de:
+    - Dispatcher: Se encarga de recibir las solicitudes del cliente y repartirlas entre los workers.
+  - Nodo: Este va a registrar en un Daemon sus funcionalidad de:
+    - Worker: Parte que se encarga de almacenar los datos y procesar las solicitudes recibidas.
 
 Mientras, los workers trabajan con una base de datos distribuida basada en una arquitectura Master-Slave, donde se dividen en grupos de tamaño $n$ configurable. En cada grupo se tiene un master y $n-1$ slaves, donde el master es el encargado de almacenar el fragmento de la base de datos distribuida y de responder las peticiones o hacer cambios en la base de datos según las peticiones recibidas. Los slaves son nodos encargados de almacenar copias de la base de datos para garantizar la disponibilidad y tolerancia a fallos. De esta manera, si el master falla, uno de los slaves puede asumir su papel y continuar procesando las solicitudes.
  
