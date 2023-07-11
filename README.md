@@ -86,11 +86,13 @@ La implementación realizada partiendo del name-server de python garantiza que e
 
 Si un nodo se desconecta de la red, falla o se vuelve inaccesible ocurre alguno de los siguientes casos:
 
-- el nodo era el dispatcher del sistema:
-El dispatcher tiene una línea de sucesión en la cuál todos los masters del sistema conocen la lista de la línea de succesión hasta ellos, siendo estos el último elemento de su lista. En caso de desconección del dispatcher se pierde el name-server que este tenía
+- El nodo era el dispatcher del sistema:
+El dispatcher tiene una línea de sucesión en la cuál todos los masters del sistema conocen la lista de la línea de succesión hasta ellos, siendo estos el último elemento de su lista. En caso de desconección del dispatcher se pierde el name-server que este tenía, por lo cual hay que crear uno nuevo, para esto todos los nodos al ver que han perdido la conexión con el name-server buscar su lista de sucesión para ver quién debe convertirse en el nuevo dispatcher, si el primero en dicha lista está conectado espera a que se declare como nuevo líder, si este no se encuentra disponible se saca de la lista y se sigue buscando hasta encontrar uno, en caso de que no encuentre ninguno anterior a él, entonces será el nuevo líder, crea un nuevo name-server y espera a que todos se conecten con él para guardar sus datos. De esta manera se garantiza que siempre exista un dispatcher en el sistema.
 
-- el nodo era un worker y un master de grupo:
+- El nodo era un worker y un master de grupo:
+En este caso, dentro de cada grupo igual que con el caso del dispatcher, se tiene una lista de sucesión, en caso de que el master falle, el primer slave de la lista se convierte en el nuevo master, y se le notifica a todos los slaves que este es el nuevo master, además se guarda en el name-server como master de su grupo.
 
-- el nodo era un worker y un slave de un grupo:
 
+- El nodo era un worker y un slave de un grupo:
+Este es el caso más sencillo, si un slave se cae y su grupo se queda con una cantidad de servers menor a la configurada, se le notifica al master del grupo que este grupo debe ser disuelto y la parte de base de datos que estos almacenaban se reparte de forma uniforme entre los otros grupos para luego proceder a reubicar estos nodos en esos grupos ya existentes.
 
