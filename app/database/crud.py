@@ -9,7 +9,7 @@ from typing import List, Annotated, Tuple
 
 from . import models, schemas, tools
 from app.utils.utils import *
-from app.database.schemas import TagCreate, FileCreate
+from app.database.schemas import TagCreate, FileCreate, UploadFile
 
 
 

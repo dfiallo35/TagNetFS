@@ -52,23 +52,19 @@ Se utiliza una arquitectura de sistema distribuido cliente-servidor, donde se ti
     - Worker: Parte que se encarga de almacenar los datos y procesar las solicitudes recibidas.
 
 Mientras, los workers trabajan con una base de datos distribuida basada en una arquitectura Master-Slave, donde se dividen en grupos de tamaño $n$ configurable. En cada grupo se tiene un master y $n-1$ slaves, donde el master es el encargado de almacenar el fragmento de la base de datos distribuida y de responder las peticiones o hacer cambios en la base de datos según las peticiones recibidas. Los slaves son nodos encargados de almacenar copias de la base de datos para garantizar la disponibilidad y tolerancia a fallos. De esta manera, si el master falla, uno de los slaves puede asumir su papel y continuar procesando las solicitudes.
+
+<p align="center">
+  <img width=370px src="imgs/1.jpg">
+  <br>
+  Arquitectura del Sistema
+</p>
+
  
 
 ### Comunicación:
 
-La comunicación entre servidores se realiza mediante RPC (Remote Procedure Call), utilizando un proxy para la invocación remota de procedimientos.
-
-Cuando el cliente realiza una solicitud al sistema, el dispatcher la recibe, le asigna un id y la envía a uno de los workers para su procesamiento. El worker recibe y procesa esta petición. Los workers si tienen más de una petición que procesar a la vez, las encolan y las van ejecutando por orden de llegada.
-
-Para determinar si la respuesta está lista, el dispatcher le pregunta al worker si ha finalizado la ejecución del procedimiento, utilizando el id del mismo para reconocerlo. Si la respuesta es negativa continúa esperando y repite la pregunta después de cierto tiempo. Si la respuesta es afirmativa, el servidor invoca al cliente a través del proxy y le proporciona los resultados.
-
-
-
-### Nombrado y Localización:
-
-Para tener ubicados a todos los servidores de la red se utiliza el name-server de Pyro5, lo cual permite al nodo líder buscar y conectarse con objetos Pyro de forma dinámica y transparente. Todos los nodos se encuentran ubicados en el name-server de la forma (nombre, URI) para así a través del nombre del nodo obtener su URI y poder conectarse a él. El nodo encargado de tener el name-server es el nodo líder del sistema, el que además tiene la funcionalidad de dispatcher, teniendo acceso a otras informaciones esenciales para su funcionamiento como son quienes son los master de cada grupo (a continuación se explicará que son los masters y slaves de cada grupo y que son los grupos).
-<!-- 
-En nuestro caso a excepción de la petición add que agrega un archivo al sistema y es enviado a un solo worker para ser guardado con sus correspondientes tags, todas las peticiones llaman a todos los -->
+La comunicación entre servidores se realiza mediante RPC (Remote Procedure Call), utilizando un proxy para la invocación remota de procedimientos. Mientras que el flujo de la comunicación va de la siguiente manera: el cliente realiza una solicitud al sistema, el dispatcher la recibe, le asigna un id y la envía a uno de los workers para su procesamiento. El worker recibe y procesa esta petición(Los workers si tienen más de una petición que procesar a la vez, las encolan y las van ejecutando por orden de llegada).
+Para determinar si la respuesta está lista, el dispatcher le pregunta al worker si ha finalizado la ejecución del procedimiento, utilizando el id del mismo para reconocerlo. Si aún no ha terminado continúa esperando y repite la pregunta después de cierto tiempo. Cuando se tienen los resultados de la petición, el worker los envía al dispatcher, este los recibe y los envía al cliente.
 
 
 ### Consistencia y Replicación:

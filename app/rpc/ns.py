@@ -14,7 +14,7 @@ from Pyro5.nameserver import NameServerDaemon, BroadcastServer
 from app.utils.thread import Kthread
 from app.utils.constant import *
 from app.server.base_server import BaseServer
-from app.utils.utils import read_config
+from app.utils.utils import read_configs
 
 
 class Leader(BaseServer):
@@ -23,7 +23,9 @@ class Leader(BaseServer):
         self.IP = ip
         self.PORT = port
 
-        self._timeout = read_config()["global_timeout"]
+        # configs
+        configs = read_configs()['global']
+        self._timeout = configs['timeout']
 
         self.daemon = NameServerDaemon(self.IP, self.PORT)
         self.daemon_thread = Kthread(

@@ -1,16 +1,14 @@
 import os
 import base64
-# import yaml
+import yaml
 import logging
 import hashlib
-from time import sleep
 from math import ceil, floor
-from typing import List, Dict
-from fastapi import UploadFile
 import json
 
+CONFIG_PATH_YML = 'configs.yml'
+CONFIG_PATH_JSON = 'configs.json'
 
-CONFIG_PATH = 'configs.json'
 
 def encode(data: bytes):
     return base64.b64encode(data)
@@ -18,10 +16,18 @@ def encode(data: bytes):
 def decode(data: bytes):
     return base64.b64decode(data)
 
-def read_config(filepath = CONFIG_PATH):
+def read_config_json(filepath = CONFIG_PATH_JSON):
     with open(filepath, 'r') as file:
         json_data = json.load(file)
     return json_data
+
+def write_configs(data, filepath = CONFIG_PATH_YML):
+    with open(filepath, 'w') as file:
+        yaml.dump(data, file)
+
+def read_configs(filepath = CONFIG_PATH_YML):
+    with open(filepath, 'r') as file:
+        return yaml.safe_load(file)
 
 def hash(bits: int, host: str):
     return int(hashlib.sha256(host.encode('utf-8', 'ignore')).hexdigest(), 16) % (2 ** bits)

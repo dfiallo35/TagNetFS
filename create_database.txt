@@ -1,10 +1,10 @@
-python3 client.py add -f ./example_database/flow.py -t DAA
-python3 client.py add -f ./example_database/graph_brute_force.py -t DAA  
-python3 client.py add -f ./example_database/queen_bohemian_rhapsody.mp3 -t music
-python3 client.py add -f ./example_database/n.py -f ./example_database/t.md -f ./example_database/a.txt  -t something
-python3 client.py add -f ./example_database/rasterio.png -f ./example_database/resumen.md -t ML
-python3 client.py add -f ./example_database/themes.md -f ./example_database/links.md  -t ML
-python3 client.py add -f ./example_database/change_point.ipynb -f ./example_database/CP_Lesson.pdf -t optative
-python3 client.py add -f ./example_database/notes.md -t distributed
-python3 client.py add -f ./example_database/Incertidumbre.pdf -t IA
-python3 client.py add -f ./example_database/Instrumental.xspf -t music -t something
+python3 client.py add -f ./test/flow.py -t DAA
+python3 client.py add -f ./test/graph_brute_force.py -t DAA  
+python3 client.py add -f ./test/queen_bohemian_rhapsody.mp3 -t music
+python3 client.py add -f ./test/n.py -f ./test/t.md -f ./test/a.txt  -t something
+python3 client.py add -f ./test/rasterio.png -f ./test/resumen.md -t ML
+python3 client.py add -f ./test/themes.md -f ./test/links.md  -t ML
+python3 client.py add -f ./test/change_point.ipynb -f ./test/CP_Lesson.pdf -t optative
+python3 client.py add -f ./test/notes.md -t distributed
+python3 client.py add -f ./test/Incertidumbre.pdf -t IA
+python3 client.py add -f ./test/Instrumental.xspf -t music -t something
