@@ -1,8 +1,6 @@
 # Tag Based File System
 
-#### Team:
-- Dennis Fiallo Muñoz C-411
-- Lauren Olivia Guerra Hernández C-412
+A tag-based distributed file system implemented in Python using a distributed database built from scratch.
 
 ### How to run
 
